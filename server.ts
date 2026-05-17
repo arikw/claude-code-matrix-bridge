@@ -477,7 +477,7 @@ async function main(): Promise<void> {
     `\n\nUntil setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) will refuse with the same hint. Tell the user to run the setup script in their own terminal.`
 
   const mcp = new Server(
-    { name: 'matrix-bridge', version: '0.4.3' },
+    { name: 'matrix-bridge', version: '0.4.4' },
     {
       capabilities: {
         tools: {},

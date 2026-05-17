@@ -8,7 +8,7 @@
 
 | | |
 |---|---|
-| **Status** | v0.4.3 — works against CC 2.1.143; channels API still research preview |
+| **Status** | v0.4.4 — works against CC 2.1.143; channels API still research preview |
 | **Requires** | Claude Code ≥ v2.1.80 (Channels API) · Node.js ≥ 20 · Matrix homeserver + bot account |
 | **License** | MIT |
 | **Encryption** | Plaintext only (E2EE on roadmap) |
@@ -403,7 +403,7 @@ surface gated entirely on **matrix account integrity**.
 - C0 control chars + `0x7f` stripped from inbound + reply bodies (redactControls).
 - Reply text truncated to 16 KiB.
 
-### Known limitations (v0.4.3)
+### Known limitations (v0.4.4)
 
 - **Plaintext rooms only.** E2EE via olm/megolm sidecar is on the roadmap.
 - **Single owner.** Multi-user support not yet.
