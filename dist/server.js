@@ -15837,7 +15837,7 @@ Your terminal output never reaches the user; only reply tool delivers messages b
 
 Until setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) will refuse with the same hint. Tell the user to run the setup script in their own terminal.`;
   const mcp = new Server(
-    { name: "matrix-bridge", version: "0.4.5" },
+    { name: "matrix-bridge", version: "0.4.6" },
     {
       capabilities: {
         tools: {},
