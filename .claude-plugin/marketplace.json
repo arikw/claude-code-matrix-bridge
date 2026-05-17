@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "rx-claude-matrix-bridge",
-  "description": "Matrix as a Claude Code Channel.",
+  "name": "arikw",
+  "description": "arikw's Claude Code plugins.",
   "owner": {
     "name": "arikw",
     "url": "https://github.com/arikw"
