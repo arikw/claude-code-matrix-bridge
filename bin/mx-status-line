@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# rx-claude-matrix-bridge — CC statusLine renderer.
+# CC pipes session JSON on stdin. Outputs:
+#   linked   → "🔗 mx:<name>"
+#   unlinked → "" (silent — no clutter)
+
+set -u
+input=$(cat 2>/dev/null || true)
+command -v jq >/dev/null 2>&1 || exit 0
+
+session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
+[[ -n "$session_id" ]] || exit 0
+
+STATE_DIR="${HOME}/.claude/channels/rx-claude-matrix-bridge"
+
+# Needs-setup indicator: surface BEFORE checking for a link, so the user
+# sees ⚙ even on an unlinked fresh TUI when config.env is missing.
+if [[ -f "${STATE_DIR}/needs-setup" ]]; then
+  printf '⚙ mx:needs-setup'
+  exit 0
+fi
+
+LINKS_FILE="${STATE_DIR}/links.tsv"
+[[ -f "$LINKS_FILE" ]] || exit 0
+
+row=$(awk -F'\t' -v s="$session_id" '$1==s {print; exit}' "$LINKS_FILE")
+[[ -n "$row" ]] || exit 0
+
+name=$(printf '%s' "$row" | awk -F'\t' '{print $4}')
+room=$(printf '%s' "$row" | awk -F'\t' '{print $2}')
+
+# Prefer the daemon's cached room name (fetched from Matrix /state). Falls
+# back to the name stored in links.tsv at link time, then to the room id.
+safe_room=$(printf '%s' "$room" | tr -c 'A-Za-z0-9_-' '_')
+cache_file="${HOME}/.claude/channels/rx-claude-matrix-bridge/room-names/${safe_room}"
+cached_name=''
+[[ -f "$cache_file" ]] && cached_name=$(tr -d '\n' <"$cache_file" 2>/dev/null)
+label="${cached_name:-${name:-$room}}"
+if (( ${#label} > 30 )); then label="${label:0:27}…"; fi
+
+# Owner-typing indicator (daemon writes flag file when owner is typing in this room).
+typing_file="${HOME}/.claude/channels/rx-claude-matrix-bridge/typing/${safe_room}"
+typing_glyph=''
+[[ -f "$typing_file" ]] && typing_glyph=' ✏️'
+
+# Channels-capable flag: if the MCP server detected CC was launched WITHOUT
+# --dangerously-load-development-channels, matrix→TUI inbound is silently
+# dropped — show a broken-link glyph so the user sees something is wrong.
+chan_file="${HOME}/.claude/channels/rx-claude-matrix-bridge/channels-capable/${session_id}"
+link_glyph='🔗'
+if [[ -f "$chan_file" ]]; then
+  flag=$(tr -d '[:space:]' <"$chan_file" 2>/dev/null)
+  [[ "$flag" == "false" ]] && link_glyph='⛓️‍💥'
+fi
+
+printf '%s%s mx:%s' "$link_glyph" "$typing_glyph" "$label"

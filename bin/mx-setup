@@ -1,0 +1,322 @@
+#!/usr/bin/env bash
+# rx-claude-matrix-bridge — interactive setup wizard.
+#
+# Collects matrix homeserver / bot account / owner, optionally creates
+# the bot via the Synapse admin API (if the owner is a Synapse admin),
+# performs a password login to obtain the bot's access token, writes
+# ~/.config/rx-claude-matrix-bridge/config.env (chmod 0600), then kills
+# the daemon so the next CC launch picks up fresh creds.
+#
+# Safe to re-run. Existing values are shown as defaults; press <enter>
+# to keep them. Passwords are never echoed and never stored.
+
+set -euo pipefail
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/rx-claude-matrix-bridge"
+CONFIG_FILE="${CONFIG_DIR}/config.env"
+STATE_DIR="${HOME}/.claude/channels/rx-claude-matrix-bridge"
+DAEMON_PID_FILE="${STATE_DIR}/daemon.pid"
+NEEDS_SETUP_FLAG="${STATE_DIR}/needs-setup"
+
+# ---------- preflight ----------
+
+for bin in curl jq; do
+  command -v "$bin" >/dev/null 2>&1 || { echo "error: '$bin' required" >&2; exit 1; }
+done
+
+# ---------- load existing values (if any) ----------
+
+OLD_HOMESERVER=''
+OLD_USER_ID=''
+OLD_OWNER=''
+OLD_PERMISSION_MODE=''
+if [[ -f "$CONFIG_FILE" ]]; then
+  # shellcheck disable=SC1090
+  set -a; . "$CONFIG_FILE" 2>/dev/null || true; set +a
+  OLD_HOMESERVER="${MATRIX_HOMESERVER:-}"
+  OLD_USER_ID="${MATRIX_USER_ID:-}"
+  OLD_OWNER="${MATRIX_OWNER:-}"
+  OLD_PERMISSION_MODE="${MX_CLAUDE_PERMISSION_MODE:-}"
+fi
+
+# ---------- helpers ----------
+
+prompt() {
+  # prompt <var> <label> [default]
+  local var="$1" label="$2" def="${3:-}"
+  local val
+  if [[ -n "$def" ]]; then
+    read -r -p "$label [$def]: " val </dev/tty
+    val="${val:-$def}"
+  else
+    read -r -p "$label: " val </dev/tty
+  fi
+  printf -v "$var" '%s' "$val"
+}
+
+prompt_secret() {
+  # prompt_secret <var> <label>
+  local var="$1" label="$2"
+  local val
+  read -r -s -p "$label: " val </dev/tty
+  echo
+  printf -v "$var" '%s' "$val"
+}
+
+confirm() {
+  # confirm <prompt> <default-y-or-n> → returns 0 (yes) or 1 (no)
+  local label="$1" def="${2:-n}"
+  local hint='[y/N]'
+  [[ "$def" == "y" ]] && hint='[Y/n]'
+  local val
+  read -r -p "$label $hint " val </dev/tty
+  val="${val:-$def}"
+  [[ "$val" =~ ^[Yy]$ ]]
+}
+
+require_user_id() {
+  # require_user_id <val> <label>
+  [[ "$1" =~ ^@[^:[:space:]]+:[^:[:space:]]+$ ]] \
+    || { echo "error: bad $2 (must look like @name:server)" >&2; exit 1; }
+}
+
+# Matrix login (password) → echo access_token on stdout, errors on stderr.
+matrix_login() {
+  # matrix_login <homeserver> <localpart> <password>
+  local hs="$1" user="$2" pw="$3"
+  local payload resp tok err msg
+  payload=$(jq -nc \
+    --arg u "$user" --arg p "$pw" \
+    '{type:"m.login.password",
+      identifier:{type:"m.id.user",user:$u},
+      password:$p,
+      device_id:"matrix-bridge",
+      initial_device_display_name:"rx-claude-matrix-bridge"}')
+  resp=$(curl -sS -X POST \
+    -H 'Content-Type: application/json' \
+    --max-time 30 \
+    --data-binary "$payload" \
+    "${hs}/_matrix/client/v3/login")
+  tok=$(printf '%s' "$resp" | jq -r '.access_token // empty')
+  if [[ -z "$tok" ]]; then
+    err=$(printf '%s' "$resp" | jq -r '.errcode // "unknown"')
+    msg=$(printf '%s' "$resp" | jq -r '.error // "(no error message)"')
+    echo "login failed — $err: $msg" >&2
+    return 1
+  fi
+  printf '%s' "$tok"
+}
+
+# ---------- prompts ----------
+
+echo
+echo "RX Claude Code Matrix Bridge — setup"
+echo "===================================="
+echo
+echo "Config file: $CONFIG_FILE"
+echo
+
+prompt HOMESERVER "Matrix homeserver URL (e.g. https://matrix.org)" "$OLD_HOMESERVER"
+HOMESERVER="${HOMESERVER%/}"
+[[ "$HOMESERVER" =~ ^https?://[^[:space:]]+$ ]] || { echo "error: bad homeserver URL" >&2; exit 1; }
+
+prompt USER_ID "Bot matrix user id (e.g. @yourbot:matrix.org)" "$OLD_USER_ID"
+require_user_id "$USER_ID" "bot user id"
+BOT_LOCALPART="${USER_ID#@}"
+BOT_LOCALPART="${BOT_LOCALPART%%:*}"
+
+prompt OWNER "Your (owner) matrix user id (e.g. @you:matrix.org)" "$OLD_OWNER"
+require_user_id "$OWNER" "owner user id"
+OWNER_LOCALPART="${OWNER#@}"
+OWNER_LOCALPART="${OWNER_LOCALPART%%:*}"
+
+# ---------- bot-create branch ----------
+
+CREATE_BOT='no'
+if confirm "Create the bot account now via Synapse admin API? (Requires the owner to be a Synapse admin)" n; then
+  CREATE_BOT='yes'
+fi
+
+BOT_PASSWORD=''
+
+if [[ "$CREATE_BOT" == "yes" ]]; then
+  echo
+  echo "Bot-create path:"
+  echo "  1. Logging in as $OWNER to obtain an admin token …"
+  prompt_secret OWNER_PASSWORD "Owner ($OWNER) password (one-shot, not stored)"
+  [[ -n "$OWNER_PASSWORD" ]] || { echo "error: empty owner password" >&2; exit 1; }
+
+  OWNER_TOKEN=$(matrix_login "$HOMESERVER" "$OWNER_LOCALPART" "$OWNER_PASSWORD") || exit 1
+  unset OWNER_PASSWORD
+
+  echo "  2. Checking Synapse admin status …"
+  ADMIN_PROBE=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' \
+    -H "Authorization: Bearer $OWNER_TOKEN" \
+    "${HOMESERVER}/_synapse/admin/v1/server_version")
+  if [[ "$ADMIN_PROBE" != "200" ]]; then
+    echo "error: $OWNER is not a Synapse admin (or homeserver is not Synapse)." >&2
+    echo "Hint: log in as a Synapse admin to grant admin, then re-run." >&2
+    echo "Or skip the bot-create step and create the bot manually." >&2
+    exit 1
+  fi
+  echo "     ✓ admin verified"
+
+  # If the bot user already exists, ask before overwriting its password.
+  EXISTS_PROBE=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' \
+    -H "Authorization: Bearer $OWNER_TOKEN" \
+    "${HOMESERVER}/_synapse/admin/v2/users/$(jq -rn --arg v "$USER_ID" '$v|@uri')")
+  if [[ "$EXISTS_PROBE" == "200" ]]; then
+    echo "  ⚠ $USER_ID already exists on this homeserver."
+    if ! confirm "Overwrite its password with a new one?" n; then
+      echo "Aborting bot-create. To use the existing account, re-run setup and answer 'no' to bot-create." >&2
+      exit 1
+    fi
+  fi
+
+  echo "  3. Creating $USER_ID …"
+  prompt_secret NEW_BOT_PASSWORD "New bot password (will be set on the account)"
+  [[ -n "$NEW_BOT_PASSWORD" ]] || { echo "error: empty bot password" >&2; exit 1; }
+  prompt_secret CONFIRM_BOT_PASSWORD "Confirm new bot password"
+  [[ "$NEW_BOT_PASSWORD" == "$CONFIRM_BOT_PASSWORD" ]] || { echo "error: passwords do not match" >&2; exit 1; }
+  unset CONFIRM_BOT_PASSWORD
+
+  CREATE_PAYLOAD=$(jq -nc \
+    --arg p "$NEW_BOT_PASSWORD" \
+    '{password:$p, displayname:"rx-claude-matrix-bridge"}')
+  CREATE_RESP=$(curl -sS -X PUT \
+    -H "Authorization: Bearer $OWNER_TOKEN" \
+    -H 'Content-Type: application/json' \
+    --max-time 30 \
+    --data-binary "$CREATE_PAYLOAD" \
+    "${HOMESERVER}/_synapse/admin/v2/users/$(jq -rn --arg v "$USER_ID" '$v|@uri')")
+  CREATE_ERR=$(printf '%s' "$CREATE_RESP" | jq -r '.errcode // empty')
+  if [[ -n "$CREATE_ERR" ]]; then
+    msg=$(printf '%s' "$CREATE_RESP" | jq -r '.error // "(no message)"')
+    echo "error: bot create failed — $CREATE_ERR: $msg" >&2
+    exit 1
+  fi
+  echo "     ✓ bot account ready"
+
+  BOT_PASSWORD="$NEW_BOT_PASSWORD"
+  unset NEW_BOT_PASSWORD CREATE_PAYLOAD OWNER_TOKEN
+else
+  echo
+  prompt_secret BOT_PASSWORD "Bot ($USER_ID) password (one-shot, used to obtain a token, not stored)"
+  [[ -n "$BOT_PASSWORD" ]] || { echo "error: empty password" >&2; exit 1; }
+fi
+
+# ---------- optional: permission mode for headless turns ----------
+#
+# Controls --permission-mode passed to `claude --print --resume` spawns
+# the daemon uses when the TUI is offline. Empty = inherit CC default.
+# bypassPermissions removes ALL tool-permission prompts — anyone who
+# controls the owner matrix account can run Bash/Edit/Write without
+# confirmation. Treat with care.
+
+echo
+echo "Optional: --permission-mode for HEADLESS matrix-triggered turns"
+echo "  (used when the linked TUI is offline; live TUI turns are unaffected)"
+echo "  Allowed: default | acceptEdits | plan | bypassPermissions"
+echo "  Press <enter> to skip (inherit CC default)."
+prompt PERMISSION_MODE "  Permission mode" "$OLD_PERMISSION_MODE"
+
+case "$PERMISSION_MODE" in
+  '' | default | acceptEdits | plan)
+    ;;
+  bypassPermissions)
+    echo
+    echo "⚠ DANGER: bypassPermissions removes ALL tool-permission prompts for"
+    echo "  matrix-triggered headless turns. Anyone who controls the owner"
+    echo "  matrix account can run Bash/Edit/Write tools on this host without"
+    echo "  any confirmation."
+    if ! confirm "  Are you sure?" n; then
+      echo "Aborted. Re-run setup and pick a safer mode." >&2
+      exit 1
+    fi
+    if ! confirm "  Really, really sure? Type 'y' only if you understand the RCE surface." n; then
+      echo "Aborted." >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "error: '$PERMISSION_MODE' is not a valid --permission-mode value." >&2
+    exit 1
+    ;;
+esac
+
+# ---------- bot login → token ----------
+
+echo
+echo "Logging in as $USER_ID …"
+TOKEN=$(matrix_login "$HOMESERVER" "$BOT_LOCALPART" "$BOT_PASSWORD") || exit 1
+unset BOT_PASSWORD
+
+# ---------- whoami sanity check ----------
+
+WHO=$(curl -sS --max-time 15 \
+  -H "Authorization: Bearer $TOKEN" \
+  "${HOMESERVER}/_matrix/client/v3/account/whoami")
+WHO_USER=$(printf '%s' "$WHO" | jq -r '.user_id // empty')
+if [[ "$WHO_USER" != "$USER_ID" ]]; then
+  echo "error: whoami returned '$WHO_USER', expected '$USER_ID'" >&2
+  exit 1
+fi
+echo "✓ token works (device matrix-bridge)"
+
+# ---------- write config ----------
+#
+# Preserve any lines in the existing config that aren't one of the four
+# mandatory keys (comments, blank lines, optional knobs like
+# MX_ROOM_PRESET, future vars). Only the mandatory four get rewritten.
+
+mkdir -p "$CONFIG_DIR"
+chmod 0700 "$CONFIG_DIR" 2>/dev/null || true
+
+TMP=$(mktemp "${CONFIG_FILE}.XXXXXX")
+chmod 0600 "$TMP"
+
+# Keys the wizard owns — any prior values for these are dropped (the
+# new values above replace them). Everything else is carried over verbatim.
+WIZARD_KEYS='^(MATRIX_HOMESERVER|MATRIX_USER_ID|MATRIX_ACCESS_TOKEN|MATRIX_OWNER|MX_CLAUDE_PERMISSION_MODE)='
+
+{
+  echo "# Updated by bin/mx-setup at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "MATRIX_HOMESERVER=${HOMESERVER}"
+  echo "MATRIX_USER_ID=${USER_ID}"
+  echo "MATRIX_ACCESS_TOKEN=${TOKEN}"
+  echo "MATRIX_OWNER=${OWNER}"
+  if [[ -n "$PERMISSION_MODE" ]]; then
+    echo "MX_CLAUDE_PERMISSION_MODE=${PERMISSION_MODE}"
+  fi
+  if [[ -f "$CONFIG_FILE" ]]; then
+    # Carry over every other line verbatim. Drop any prior "Updated by
+    # bin/mx-setup" header so we don't accumulate stale timestamps.
+    grep -vE "${WIZARD_KEYS}|^# Updated by bin/mx-setup at " "$CONFIG_FILE" 2>/dev/null || true
+  fi
+} >"$TMP"
+
+mv -f "$TMP" "$CONFIG_FILE"
+chmod 0600 "$CONFIG_FILE"
+echo "Wrote $CONFIG_FILE (chmod 0600) — preserved $(grep -cvE "${WIZARD_KEYS}|^# Updated by bin/mx-setup at |^$" "$CONFIG_FILE" 2>/dev/null || echo 0) extra line(s)"
+
+# ---------- clear needs-setup flag ----------
+
+rm -f "$NEEDS_SETUP_FLAG" 2>/dev/null || true
+
+# ---------- restart daemon so it re-reads config ----------
+
+if [[ -f "$DAEMON_PID_FILE" ]]; then
+  pid=$(cat "$DAEMON_PID_FILE" 2>/dev/null)
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    kill -TERM "$pid" 2>/dev/null || true
+    echo "Killed daemon pid=$pid (auto-respawns on next MCP connection)."
+  fi
+fi
+
+echo
+echo "Setup complete."
+echo "Next steps:"
+echo "  1. Relaunch Claude Code with the channels flag:"
+echo "       claude --dangerously-load-development-channels server:matrix-bridge"
+echo "  2. Inside the TUI, run: /mx-link-chat"
+echo

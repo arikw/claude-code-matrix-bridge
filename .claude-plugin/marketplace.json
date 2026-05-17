@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "rx-claude-matrix-bridge",
+  "description": "Matrix as a Claude Code Channel.",
+  "owner": {
+    "name": "arikw",
+    "url": "https://github.com/arikw"
+  },
+  "plugins": [
+    {
+      "name": "rx-claude-matrix-bridge",
+      "description": "Live two-way Matrix ↔ TUI bridge via Channels API. Always-on daemon + per-session routing + headless `claude --print` fallback.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

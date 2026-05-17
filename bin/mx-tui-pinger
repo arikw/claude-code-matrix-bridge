@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# rx-claude-matrix-bridge — background m.typing pinger for TUI mirror.
+# Started by UserPromptSubmit hook, killed by Stop hook.
+# Sends typing=true every 20s; typing=false on TERM/INT/EXIT.
+
+set -u
+
+ROOM="${1:-}"
+[[ -n "$ROOM" ]] || exit 0
+
+PID_FILE="${HOME}/.claude/channels/rx-claude-matrix-bridge/tui-pinger.pid"
+
+CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/rx-claude-matrix-bridge/config.env"
+[[ -f "$CONFIG_FILE" ]] || exit 0
+# shellcheck disable=SC1090
+set -a; . "$CONFIG_FILE"; set +a
+[[ -n "${MATRIX_HOMESERVER:-}" && -n "${MATRIX_ACCESS_TOKEN:-}" && -n "${MATRIX_USER_ID:-}" ]] || exit 0
+
+URL_ROOM=$(jq -rn --arg v "$ROOM"             '$v|@uri')
+URL_USER=$(jq -rn --arg v "$MATRIX_USER_ID"   '$v|@uri')
+ENDPOINT="${MATRIX_HOMESERVER%/}/_matrix/client/v3/rooms/${URL_ROOM}/typing/${URL_USER}"
+
+cleanup() {
+  curl -sS -X PUT --max-time 5 \
+    -H "Authorization: Bearer ${MATRIX_ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data '{"typing":false}' \
+    "$ENDPOINT" >/dev/null 2>&1 || true
+  [[ -f "$PID_FILE" && "$(cat "$PID_FILE" 2>/dev/null)" == "$$" ]] && rm -f "$PID_FILE"
+  exit 0
+}
+trap cleanup TERM INT EXIT
+
+echo "$$" >"$PID_FILE"
+
+while :; do
+  curl -sS -X PUT --max-time 5 \
+    -H "Authorization: Bearer ${MATRIX_ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data '{"typing":true,"timeout":30000}' \
+    "$ENDPOINT" >/dev/null 2>&1
+  # `sleep & wait` so SIGTERM is delivered to bash immediately, not held
+  # until sleep returns. Without this the trap fires up to 20s late.
+  sleep 20 &
+  wait $!
+done

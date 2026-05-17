@@ -1,0 +1,13 @@
+*.log
+*.log.[0-9]
+*.pid
+.DS_Store
+node_modules/
+.tmp/
+tests/.tmp/
+
+# Private working notes — not for publication
+docs/superpowers/
+.claude/memory/
+.claude/plans/
+.claude/settings.local.json

@@ -1,0 +1,49 @@
+{
+  "name": "rx-claude-matrix-bridge",
+  "version": "0.4.2",
+  "description": "Matrix as a Claude Code Channel. Always-on Matrix daemon + per-TUI MCP relay. Per-session room routing via link_chat tool. Headless `claude --print --resume` fallback for offline TUIs so messages never get lost.",
+  "keywords": ["matrix", "channel", "chat", "bridge", "daemon"],
+  "author": {
+    "name": "arikw",
+    "url": "https://github.com/arikw"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/user-prompt-submit.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/stop.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash \"${CLAUDE_PLUGIN_ROOT}/bin/mx-status-line\""
+  }
+}

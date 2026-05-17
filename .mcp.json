@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "matrix-bridge": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "ROOT=\"$1\"; case \"$ROOT\" in '${'*|''|.) ROOT=\"\";; esac; [ -z \"$ROOT\" ] && ROOT=$(cat ~/.claude/channels/rx-claude-matrix-bridge/plugin-root 2>/dev/null); [ -z \"$ROOT\" ] && ROOT=\"$PWD\"; cd \"$ROOT\" && exec npm start --silent",
+        "--",
+        "${CLAUDE_PLUGIN_ROOT:-}"
+      ]
+    }
+  }
+}

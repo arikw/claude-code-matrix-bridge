@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# rx-claude-matrix-bridge — per-project bootstrap.
+# Writes .claude/settings.json in the target project with:
+#   - statusLine: shows 🔗 mx:<room> when current session is linked
+# Preserves any existing statusLine via jq merge (other keys untouched).
+#
+# Usage:
+#   mx-enable-statusline            # install in $PWD
+#   mx-enable-statusline <project>  # install in <project>
+#   mx-enable-statusline --uninstall [<project>]
+
+set -u
+
+PROJECT="${1:-$PWD}"
+case "${1:-}" in
+  --uninstall)
+    PROJECT="${2:-$PWD}"
+    SETTINGS="$PROJECT/.claude/settings.json"
+    if [[ -f "$SETTINGS" ]] && command -v jq >/dev/null 2>&1; then
+      tmp="$SETTINGS.tmp.$$"
+      jq 'del(.statusLine)' "$SETTINGS" >"$tmp" && mv "$tmp" "$SETTINGS"
+      printf 'uninstalled statusLine from %s\n' "$SETTINGS"
+    else
+      printf 'no settings.json or jq missing — nothing to uninstall\n' >&2
+    fi
+    exit 0
+    ;;
+esac
+
+if [[ ! -d "$PROJECT" ]]; then
+  printf 'project dir does not exist: %s\n' "$PROJECT" >&2
+  exit 2
+fi
+command -v jq >/dev/null 2>&1 || { printf 'jq required\n' >&2; exit 2; }
+
+# Resolve bridge dir from CLAUDE_PLUGIN_ROOT or script location.
+BRIDGE="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+STATUS_BIN="$BRIDGE/bin/mx-status-line"
+if [[ ! -x "$STATUS_BIN" ]]; then
+  printf 'mx-status-line not executable at %s\n' "$STATUS_BIN" >&2
+  exit 2
+fi
+
+mkdir -p "$PROJECT/.claude"
+SETTINGS="$PROJECT/.claude/settings.json"
+
+STATUSLINE_JSON=$(jq -nc --arg cmd "bash \"$STATUS_BIN\"" \
+  '{type:"command",command:$cmd,refreshInterval:2}')
+
+if [[ -f "$SETTINGS" ]]; then
+  tmp="$SETTINGS.tmp.$$"
+  jq --argjson sl "$STATUSLINE_JSON" '.statusLine = $sl' "$SETTINGS" >"$tmp" \
+    && mv "$tmp" "$SETTINGS"
+  printf 'updated %s (statusLine set)\n' "$SETTINGS"
+else
+  jq -n --argjson sl "$STATUSLINE_JSON" '{statusLine:$sl}' >"$SETTINGS"
+  printf 'created %s with statusLine\n' "$SETTINGS"
+fi
+
+printf '\nstatusLine command: %s\n' "bash \"$STATUS_BIN\""
+printf 'Restart Claude Code in %s for it to take effect.\n' "$PROJECT"
