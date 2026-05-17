@@ -4,7 +4,7 @@
       "command": "bash",
       "args": [
         "-c",
-        "ROOT=\"$1\"; case \"$ROOT\" in '${'*|''|.) ROOT=\"\";; esac; [ -z \"$ROOT\" ] && ROOT=$(cat ~/.claude/channels/rx-claude-matrix-bridge/plugin-root 2>/dev/null); [ -z \"$ROOT\" ] && ROOT=\"$PWD\"; cd \"$ROOT\" && exec npm start --silent",
+        "ROOT=\"$1\"; case \"$ROOT\" in '${'*|''|.) ROOT=\"\";; esac; [ -z \"$ROOT\" ] && ROOT=$(cat ~/.claude/channels/rx-claude-matrix-bridge/plugin-root 2>/dev/null); [ -z \"$ROOT\" ] && ROOT=\"$PWD\"; if [ -f \"$ROOT/dist/server.js\" ]; then exec node \"$ROOT/dist/server.js\"; else cd \"$ROOT\" && exec npm start --silent; fi",
         "--",
         "${CLAUDE_PLUGIN_ROOT:-}"
       ]

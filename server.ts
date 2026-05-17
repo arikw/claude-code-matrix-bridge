@@ -14,7 +14,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import { spawn } from 'node:child_process'
 import * as net from 'node:net'
-import { promises as fs, readFileSync } from 'node:fs'
+import { promises as fs, readFileSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -132,11 +132,25 @@ async function daemonAlive(): Promise<boolean> {
   }
 }
 
+// Locate the daemon entry point. Three modes:
+//  1. Production bundle: server.js sits at <plugin>/dist/server.js,
+//     daemon.js is its sibling.
+//  2. Dev with build: tsx server.ts from repo root; dist/daemon.js exists.
+//  3. Dev no build: fall back to spawning daemon.ts via tsx.
+function resolveDaemonSpawn(): { cmd: string; args: string[] } {
+  const sibling = join(__dirname, 'daemon.js')
+  if (existsSync(sibling)) return { cmd: 'node', args: [sibling] }
+  const distJs = join(__dirname, 'dist', 'daemon.js')
+  if (existsSync(distJs)) return { cmd: 'node', args: [distJs] }
+  const sourceTs = join(__dirname, 'daemon.ts')
+  return { cmd: 'npx', args: ['--yes', 'tsx', sourceTs] }
+}
+
 async function spawnDaemon(): Promise<void> {
-  const daemonPath = join(__dirname, 'daemon.ts')
-  await log('info', `spawning daemon path=${daemonPath}`)
+  const { cmd, args } = resolveDaemonSpawn()
+  await log('info', `spawning daemon cmd=${cmd} args=${args.join(' ')}`)
   const out = await fs.open(LOG_FILE + '.daemon-stdio', 'a').catch(() => null)
-  const child = spawn('npx', ['--yes', 'tsx', daemonPath], {
+  const child = spawn(cmd, args, {
     detached: true,
     stdio: out ? ['ignore', out.fd, out.fd] : 'ignore',
     cwd: __dirname,

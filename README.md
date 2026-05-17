@@ -37,15 +37,30 @@ research-preview flag is the cost of that integration.
 
 ## Install
 
-### 1. Clone
+### 1. Get the plugin
+
+**Option A — CC plugin marketplace** (recommended for end users):
+
+```bash
+claude plugin marketplace add arikw/claude-code-matrix-bridge
+claude plugin install rx-claude-matrix-bridge@arikw
+```
+
+This drops a pre-bundled copy under `~/.claude/plugins/.../rx-claude-matrix-bridge/`.
+No `npm install` needed — `dist/server.js` and `dist/daemon.js` are committed as
+single-file esbuild bundles with all runtime deps inlined.
+
+**Option B — git clone** (for development, or if you want to rebuild from source):
 
 ```bash
 git clone https://github.com/arikw/claude-code-matrix-bridge.git
 cd claude-code-matrix-bridge
 npm install
+npm run build      # produces dist/server.js + dist/daemon.js
 ```
 
-(Plugin marketplace publishing is on the roadmap; for now, git clone is the path.)
+The runtime auto-detects: `dist/server.js` if present (production / built dev
+checkout), otherwise spawns `tsx server.ts` directly (unbuilt dev checkout).
 
 ### 2. Create a Matrix account for the bot
 
@@ -62,10 +77,15 @@ account. Two ways:
 ### 3. Run the setup wizard
 
 ```bash
-bash /path/to/claude-code-matrix-bridge/bin/mx-setup
+bash /absolute/path/to/the/plugin/bin/mx-setup
 ```
 
-(use the absolute path that matches where you cloned the repo)
+The absolute path depends on how you installed:
+- **Plugin marketplace install**: `~/.claude/plugins/marketplaces/arikw/rx-claude-matrix-bridge/bin/mx-setup`
+- **Git clone**: `/path/where/you/cloned/claude-code-matrix-bridge/bin/mx-setup`
+
+(If you forget the exact path, launch CC once with the channels flag and run
+`/mx-link-chat` — the bridge prints the correct absolute path in its setup hint.)
 
 The wizard prompts for homeserver / bot user / owner, optionally creates the
 bot account via the Synapse admin API (asks for the owner's password, verifies
@@ -411,9 +431,11 @@ surface gated entirely on **matrix account integrity**.
 ```
 .claude-plugin/        plugin.json, marketplace.json
 .mcp.json              stdio MCP server registration
-daemon.ts              always-on Matrix daemon
-server.ts              MCP relay client (per-TUI stdio)
-protocol.ts            shared AF_UNIX line-JSON types
+daemon.ts              source: always-on Matrix daemon
+server.ts              source: MCP relay client (per-TUI stdio)
+protocol.ts            source: shared AF_UNIX line-JSON types
+build.mjs              esbuild config (npm run build → dist/)
+dist/                  pre-bundled JS shipped in the plugin (server.js, daemon.js)
 hooks/                 session-start.sh, user-prompt-submit.sh, stop.sh
 bin/                   mx-setup, mx-status-line, mx-tui-pinger, mx-enable-statusline
 commands/              mx-link-chat.md, mx-enable-statusline.md

@@ -1,19 +1,21 @@
 {
   "name": "rx-claude-matrix-bridge",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "description": "Matrix as a Claude Code Channel: live two-way bridge with always-on daemon + per-session routing + headless fallback for offline TUIs.",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "tsx server.ts",
     "daemon": "tsx daemon.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "node build.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "esbuild": "^0.28.0",
     "tsx": "^4.20.0",
     "typescript": "^5.7.0"
   },
