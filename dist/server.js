@@ -15532,9 +15532,10 @@ async function checkConfigPresence() {
   }
   return { ok: true };
 }
+var PLUGIN_ROOT = __dirname.endsWith("/dist") || __dirname.endsWith("\\dist") ? dirname(__dirname) : __dirname;
 function setupCommandHint() {
-  const script = join(__dirname, "bin", "mx-setup");
-  return `bridge is not configured. Run this in a separate terminal (NOT inside Claude Code), then relaunch CC:
+  const script = join(PLUGIN_ROOT, "bin", "mx-setup");
+  return `bridge is not configured. Run this in a separate terminal (NOT inside Claude Code), then relaunch Claude Code:
 
     bash "${script}"
 
@@ -15728,9 +15729,9 @@ async function channelsCapableWarning(sid) {
   try {
     const flag = (await fs.readFile(join(STATE_DIR, "channels-capable", sid), "utf8")).trim();
     if (flag === "false") {
-      return `\u26A0 WARNING: this CC was launched WITHOUT --dangerously-load-development-channels server:matrix-bridge.
+      return `\u26A0 WARNING: this Claude Code instance was launched WITHOUT --dangerously-load-development-channels server:matrix-bridge.
 Matrix messages sent to this room will NOT reach this TUI (silent drop).
-Relaunch CC with: claude --dangerously-load-development-channels server:matrix-bridge [other flags]`;
+Relaunch Claude Code with: claude --dangerously-load-development-channels server:matrix-bridge [other flags]`;
     }
   } catch {
   }
@@ -15768,8 +15769,7 @@ async function readSessionFromHook(timeoutMs = 8e3, verbose = false) {
 async function main() {
   await fs.mkdir(STATE_DIR, { recursive: true });
   try {
-    const pluginRoot = __dirname.endsWith("/dist") || __dirname.endsWith("\\dist") ? dirname(__dirname) : __dirname;
-    await fs.writeFile(join(STATE_DIR, "plugin-root"), pluginRoot);
+    await fs.writeFile(join(STATE_DIR, "plugin-root"), PLUGIN_ROOT);
   } catch {
   }
   const quickHook = await readSessionFromHook(300, true);
@@ -15912,7 +15912,7 @@ Until setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) w
     if (!channelsCapable) {
       void log(
         "warn",
-        `MATRIX-BRIDGE: CC launched WITHOUT --dangerously-load-development-channels server:matrix-bridge. Matrix\u2192TUI inbound will NOT reach this session. Relaunch with that flag.`
+        `MATRIX-BRIDGE: Claude Code was launched WITHOUT --dangerously-load-development-channels server:matrix-bridge. Matrix\u2192TUI inbound will NOT reach this session. Relaunch with that flag.`
       );
     }
   };

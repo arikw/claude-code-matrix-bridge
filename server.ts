@@ -99,10 +99,19 @@ async function checkConfigPresence(): Promise<{ ok: true } | { ok: false; reason
   return { ok: true }
 }
 
+// Plugin root: in the bundled layout (dist/server.js) __dirname points
+// at <plugin>/dist, but bin/, hooks/, .mcp.json etc. all live in
+// <plugin>. Strip a trailing /dist so paths advertised to the user
+// always anchor at the plugin root.
+const PLUGIN_ROOT =
+  __dirname.endsWith('/dist') || __dirname.endsWith('\\dist')
+    ? dirname(__dirname)
+    : __dirname
+
 function setupCommandHint(): string {
-  const script = join(__dirname, 'bin', 'mx-setup')
+  const script = join(PLUGIN_ROOT, 'bin', 'mx-setup')
   return (
-    `bridge is not configured. Run this in a separate terminal (NOT inside Claude Code), then relaunch CC:\n\n` +
+    `bridge is not configured. Run this in a separate terminal (NOT inside Claude Code), then relaunch Claude Code:\n\n` +
     `    bash "${script}"\n\n` +
     `The wizard will collect your matrix homeserver / bot / owner, do a one-shot password login to obtain an access token, and write ~/.config/rx-claude-matrix-bridge/config.env (chmod 0600).`
   )
@@ -332,9 +341,9 @@ async function channelsCapableWarning(sid: string): Promise<string> {
     const flag = (await fs.readFile(join(STATE_DIR, 'channels-capable', sid), 'utf8')).trim()
     if (flag === 'false') {
       return (
-        `⚠ WARNING: this CC was launched WITHOUT --dangerously-load-development-channels server:matrix-bridge.\n` +
+        `⚠ WARNING: this Claude Code instance was launched WITHOUT --dangerously-load-development-channels server:matrix-bridge.\n` +
         `Matrix messages sent to this room will NOT reach this TUI (silent drop).\n` +
-        `Relaunch CC with: claude --dangerously-load-development-channels server:matrix-bridge [other flags]`
+        `Relaunch Claude Code with: claude --dangerously-load-development-channels server:matrix-bridge [other flags]`
       )
     }
   } catch {}
@@ -381,15 +390,10 @@ async function main(): Promise<void> {
 
   // Self-locate: write our installation root so slash-command bash scripts
   // and the .mcp.json fallback chain can find bin/ + dist/ without relying
-  // on CLAUDE_PLUGIN_ROOT (CC doesn't always set it for the .mcp.json MCP
-  // launcher). In the production bundle, __dirname is <plugin>/dist — strip
-  // that suffix so the file always points at the plugin's top dir.
+  // on CLAUDE_PLUGIN_ROOT. PLUGIN_ROOT is __dirname with a trailing /dist
+  // stripped (see its definition near setupCommandHint).
   try {
-    const pluginRoot =
-      __dirname.endsWith('/dist') || __dirname.endsWith('\\dist')
-        ? dirname(__dirname)
-        : __dirname
-    await fs.writeFile(join(STATE_DIR, 'plugin-root'), pluginRoot)
+    await fs.writeFile(join(STATE_DIR, 'plugin-root'), PLUGIN_ROOT)
   } catch {}
 
   // Determine session_id + cwd. Three sources, in order:
@@ -572,7 +576,7 @@ async function main(): Promise<void> {
       .catch(() => {})
     if (!channelsCapable) {
       void log('warn',
-        `MATRIX-BRIDGE: CC launched WITHOUT --dangerously-load-development-channels server:matrix-bridge. ` +
+        `MATRIX-BRIDGE: Claude Code was launched WITHOUT --dangerously-load-development-channels server:matrix-bridge. ` +
         `Matrix→TUI inbound will NOT reach this session. Relaunch with that flag.`)
     }
   }

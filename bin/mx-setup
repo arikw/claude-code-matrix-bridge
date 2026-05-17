@@ -217,7 +217,7 @@ echo
 echo "Optional: --permission-mode for HEADLESS matrix-triggered turns"
 echo "  (used when the linked TUI is offline; live TUI turns are unaffected)"
 echo "  Allowed: default | acceptEdits | plan | bypassPermissions"
-echo "  Press <enter> to skip (inherit CC default)."
+echo "  Press <enter> to skip (inherit Claude Code default)."
 prompt PERMISSION_MODE "  Permission mode" "$OLD_PERMISSION_MODE"
 
 case "$PERMISSION_MODE" in

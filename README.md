@@ -1,23 +1,23 @@
 # RX Claude Code Matrix Bridge
 
 > **Live two-way Matrix ↔ Claude Code TUI bridge** via the Channels API research preview.
-> Matrix messages appear inside your running CC TUI as part of the conversation;
+> Matrix messages appear inside your running Claude Code TUI as part of the conversation;
 > Claude's replies post back to the room. Survives `claude --resume`; falls back to
 > headless `claude --print --resume` when the TUI is offline so messages never get
 > lost.
 
 | | |
 |---|---|
-| **Status** | v0.4.7 — works against CC 2.1.143; channels API still research preview |
+| **Status** | v0.4.7 — works against Claude Code 2.1.143; channels API still research preview |
 | **Requires** | Claude Code ≥ v2.1.80 (Channels API) · Node.js ≥ 20 · Matrix homeserver + bot account |
 | **License** | MIT |
 | **Encryption** | Plaintext only (E2EE on roadmap) |
 
-> ⚠ **THIS BRIDGE REQUIRES A LAUNCH FLAG.** CC must be started with
+> ⚠ **THIS BRIDGE REQUIRES A LAUNCH FLAG.** Claude Code must be started with
 > `--dangerously-load-development-channels server:matrix-bridge` (see step 5). Without
 > it, MCP tools work but matrix → TUI inbound is silently dropped. The bridge
 > detects the missing flag and surfaces a `⛓️‍💥` glyph in the statusLine + a
-> warning in `/mx-link-chat` output, but you'll still need to relaunch CC.
+> warning in `/mx-link-chat` output, but you'll still need to relaunch Claude Code.
 
 ---
 
@@ -25,9 +25,9 @@
 
 | Bridge | Transport | Inbound trigger | Flag needed |
 |---|---|---|---|
-| **This project** | CC Channels API (push) | Matrix msg autonomously wakes the live TUI session | Yes |
+| **This project** | Claude Code Channels API (push) | Matrix msg autonomously wakes the live TUI session | Yes |
 | elkimek/matrix-bridge | MCP tool calls (pull) | Agent must call `send_and_wait` / `read_messages` | No |
-| ccbot / cc-telegram-bridge | tmux send-keys / headless `claude --print` | External transport, not CC-native | No |
+| ccbot / cc-telegram-bridge | tmux send-keys / headless `claude --print` | External transport, not Claude Code-native | No |
 
 This is the only bridge that injects matrix messages into a **live TUI conversation
 turn** rather than spawning a separate `claude` invocation. The Channels API
@@ -39,7 +39,7 @@ research-preview flag is the cost of that integration.
 
 ### 1. Get the plugin
 
-**Option A — CC plugin marketplace** (recommended for end users):
+**Option A — Claude Code plugin marketplace** (recommended for end users):
 
 ```bash
 claude plugin marketplace add arikw/claude-code-matrix-bridge
@@ -84,7 +84,7 @@ The absolute path depends on how you installed:
 - **Plugin marketplace install**: `~/.claude/plugins/marketplaces/arikw/rx-claude-matrix-bridge/bin/mx-setup`
 - **Git clone**: `/path/where/you/cloned/claude-code-matrix-bridge/bin/mx-setup`
 
-(If you forget the exact path, launch CC once with the channels flag and run
+(If you forget the exact path, launch Claude Code once with the channels flag and run
 `/mx-link-chat` — the bridge prints the correct absolute path in its setup hint.)
 
 The wizard prompts for homeserver / bot user / owner, optionally creates the
@@ -150,7 +150,7 @@ curl -s "${MATRIX_HOMESERVER}/_matrix/client/v3/account/whoami" \
 # expect: {"user_id":"@yourbot:server.tld","device_id":"matrix-bridge"}
 ```
 
-### 4. Enable Channels API in CC settings
+### 4. Enable Channels API in Claude Code settings
 
 Add to `~/.claude/settings.json`:
 
@@ -160,7 +160,7 @@ Add to `~/.claude/settings.json`:
 
 (Default may be blocked on Team/Enterprise tiers; check with your admin.)
 
-### 5. Launch CC with the channels flag
+### 5. Launch Claude Code with the channels flag
 
 ```bash
 cd /path/to/your/project
@@ -170,7 +170,7 @@ claude --dangerously-load-development-channels server:matrix-bridge
 The first launch auto-spawns the daemon. Subsequent TUIs connect to the running
 daemon over `~/.claude/channels/rx-claude-matrix-bridge/daemon.sock`.
 
-> **Make this permanent** — wrap CC in a shell alias so you don't forget the flag:
+> **Make this permanent** — wrap Claude Code in a shell alias so you don't forget the flag:
 > ```bash
 > alias claude='command claude --dangerously-load-development-channels server:matrix-bridge'
 > ```
@@ -330,9 +330,9 @@ plugin-root                            # absolute path to repo (self-locate)
 
 | Symptom | Check |
 |---|---|
-| StatusLine shows `⚙ mx:needs-setup` | `config.env` missing or has placeholder values. Run `bash /path/to/repo/bin/mx-setup` and relaunch CC. |
+| StatusLine shows `⚙ mx:needs-setup` | `config.env` missing or has placeholder values. Run `bash /path/to/repo/bin/mx-setup` and relaunch Claude Code. |
 | `/mx-link-chat` returns "bridge is not configured" | Same as above. The error message includes the absolute path to `bin/mx-setup`. |
-| StatusLine shows `⛓️‍💥` | CC launched without `--dangerously-load-development-channels server:matrix-bridge`. Relaunch with it. |
+| StatusLine shows `⛓️‍💥` | Claude Code launched without `--dangerously-load-development-channels server:matrix-bridge`. Relaunch with it. |
 | `/mx-link-chat` output includes "WARNING: launched WITHOUT --dangerously..." | Same as above. |
 | MCP not connecting (`/mcp` shows nothing) | Confirm `.mcp.json` is present in cwd, flag passed, `claude /mcp` reload. |
 | Channel events not arriving but flag is set | Confirm `"channelsEnabled": true` in `~/.claude/settings.json`. Tail `daemon.log` for `inbound→tui` entries; `server.log` for `DBG mcp.notification SENT`. |
@@ -372,7 +372,7 @@ surface gated entirely on **matrix account integrity**.
 ### Trust model
 
 - **Owner account = full control.** Anyone who controls `MATRIX_OWNER`'s matrix
-  account can send messages that trigger CC turns — including ones that invoke
+  account can send messages that trigger Claude Code turns — including ones that invoke
   the `Bash`, `Edit`, `Write` tools. Use a strong password + 2FA on that account.
 - **Bot account = posting + room membership.** Compromise leaks message contents
   and lets attacker post as the bot. Use a dedicated account; don't reuse the
@@ -387,7 +387,7 @@ surface gated entirely on **matrix account integrity**.
 | Dedicated matrix account for the bot, not your personal one | Token compromise contained to bot |
 | Strong password + 2FA on `MATRIX_OWNER` | Owner takeover = RCE on daemon host |
 | `chmod 0600 config.env` (script does this) | Token = password equivalent |
-| **Don't** launch CC with `--dangerously-skip-permissions` when using the bridge | Matrix-triggered Bash calls would skip the permission prompt; same goes for `--print` headless turns (they inherit) |
+| **Don't** launch Claude Code with `--dangerously-skip-permissions` when using the bridge | Matrix-triggered Bash calls would skip the permission prompt; same goes for `--print` headless turns (they inherit) |
 | **Don't** set `MX_CLAUDE_PERMISSION_MODE=bypassPermissions` unless you have an offline / sandboxed host | Headless matrix-triggered turns will run Bash/Edit/Write without prompting. Same RCE class as `--dangerously-skip-permissions`. The wizard requires a double confirmation if you pick it. |
 | Use a self-hosted homeserver or one whose admin you trust | Plaintext = admin reads everything |
 | Set up billing alerts on your Anthropic account | Each matrix msg = LLM call = $. Owner-account compromise can spike spend. |
@@ -422,7 +422,7 @@ surface gated entirely on **matrix account integrity**.
 - Pairing flow for multi-user
 - systemd / launchd unit for daemon
 - Plugin marketplace publishing (`claude plugin install`)
-- Headless chat for orphan rooms (talk to CC from any room without `/mx-link-chat`)
+- Headless chat for orphan rooms (talk to Claude Code from any room without `/mx-link-chat`)
 
 ---
 
