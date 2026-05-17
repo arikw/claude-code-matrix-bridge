@@ -15553,6 +15553,22 @@ async function clearNeedsSetupFlag() {
   } catch {
   }
 }
+var VERSION_FILE = join(STATE_DIR, "daemon.version");
+function readOwnVersion() {
+  let d = __dirname;
+  for (let i = 0; i < 5; i++) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(d, "package.json"), "utf8"));
+      if (pkg?.name === "rx-claude-matrix-bridge") return String(pkg.version || "0.0.0");
+    } catch {
+    }
+    const parent = dirname(d);
+    if (parent === d) break;
+    d = parent;
+  }
+  return "0.0.0";
+}
+var OWN_VERSION = readOwnVersion();
 async function daemonAlive() {
   try {
     const pid = Number((await fs.readFile(PID_FILE, "utf8")).trim());
@@ -15560,6 +15576,36 @@ async function daemonAlive() {
     process.kill(pid, 0);
     return true;
   } catch {
+    return false;
+  }
+}
+async function daemonVersion() {
+  try {
+    return (await fs.readFile(VERSION_FILE, "utf8")).trim();
+  } catch {
+    return "";
+  }
+}
+async function killStaleDaemon() {
+  if (!await daemonAlive()) return false;
+  const running = await daemonVersion();
+  if (running === OWN_VERSION) return false;
+  try {
+    const pid = Number((await fs.readFile(PID_FILE, "utf8")).trim());
+    if (!pid) return false;
+    await log("warn", `stale daemon pid=${pid} version=${running || "(unknown)"} mine=${OWN_VERSION} \u2192 SIGTERM`);
+    process.kill(pid, "SIGTERM");
+    for (let i = 0; i < 50; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      if (!await daemonAlive()) return true;
+    }
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+    }
+    return true;
+  } catch (e) {
+    await log("warn", `killStaleDaemon err=${e?.message ?? e}`);
     return false;
   }
 }
@@ -15780,6 +15826,7 @@ async function main() {
     await log("warn", `needs-setup: ${cfgCheck.reason}`);
   } else {
     await clearNeedsSetupFlag();
+    await killStaleDaemon();
     if (!await daemonAlive()) {
       await spawnDaemon();
     }
@@ -15837,7 +15884,7 @@ Your terminal output never reaches the user; only reply tool delivers messages b
 
 Until setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) will refuse with the same hint. Tell the user to run the setup script in their own terminal.`;
   const mcp = new Server(
-    { name: "matrix-bridge", version: "0.4.6" },
+    { name: "matrix-bridge", version: OWN_VERSION },
     {
       capabilities: {
         tools: {},

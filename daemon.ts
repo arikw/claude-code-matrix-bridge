@@ -13,10 +13,11 @@
 // Spawned by server.ts (or manually) via `npx tsx daemon.ts`.
 
 import { spawn } from 'node:child_process'
-import { promises as fs } from 'node:fs'
+import { promises as fs, readFileSync } from 'node:fs'
 import * as net from 'node:net'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   type ClientMessage,
   type DaemonMessage,
@@ -35,7 +36,28 @@ const SINCE_FILE   = join(STATE_DIR, 'since-token')
 const LINKS_FILE   = join(STATE_DIR, 'links.tsv')
 const LOG_FILE     = join(STATE_DIR, 'daemon.log')
 const PID_FILE     = join(STATE_DIR, 'daemon.pid')
+const VERSION_FILE = join(STATE_DIR, 'daemon.version')
 const SOCK_FILE    = join(STATE_DIR, 'daemon.sock')
+
+// Daemon advertises its own version via VERSION_FILE; server.ts checks
+// on connect and SIGTERMs + respawns a stale daemon after a plugin
+// update. Version is read at startup from package.json (single source of
+// truth) — never hardcoded.
+const DAEMON_VERSION = readOwnVersion()
+
+function readOwnVersion(): string {
+  let d = dirname(fileURLToPath(import.meta.url))
+  for (let i = 0; i < 5; i++) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(d, 'package.json'), 'utf8'))
+      if (pkg?.name === 'rx-claude-matrix-bridge') return String(pkg.version || '0.0.0')
+    } catch {}
+    const parent = dirname(d)
+    if (parent === d) break
+    d = parent
+  }
+  return '0.0.0'
+}
 const TYPING_DIR   = join(STATE_DIR, 'typing')
 const LAST_PROMPT_DIR = join(STATE_DIR, 'last-tui-prompt')
 const LAST_MATRIX_DIR = join(STATE_DIR, 'last-matrix-msg')
@@ -841,6 +863,9 @@ async function tryClaimPid(): Promise<boolean> {
   } catch {}
   await fs.mkdir(dirname(PID_FILE), { recursive: true })
   await fs.writeFile(PID_FILE, String(process.pid))
+  // Advertise our version so a newer MCP server can detect a stale daemon
+  // and SIGTERM it before connecting.
+  await fs.writeFile(VERSION_FILE, DAEMON_VERSION)
   return true
 }
 

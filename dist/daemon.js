@@ -5,10 +5,11 @@ const require = __mxCreateRequire(import.meta.url);
 
 // daemon.ts
 import { spawn } from "node:child_process";
-import { promises as fs } from "node:fs";
+import { promises as fs, readFileSync } from "node:fs";
 import * as net from "node:net";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // protocol.ts
 function encode(msg) {
@@ -39,7 +40,23 @@ var SINCE_FILE = join(STATE_DIR, "since-token");
 var LINKS_FILE = join(STATE_DIR, "links.tsv");
 var LOG_FILE = join(STATE_DIR, "daemon.log");
 var PID_FILE = join(STATE_DIR, "daemon.pid");
+var VERSION_FILE = join(STATE_DIR, "daemon.version");
 var SOCK_FILE = join(STATE_DIR, "daemon.sock");
+var DAEMON_VERSION = readOwnVersion();
+function readOwnVersion() {
+  let d = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 5; i++) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(d, "package.json"), "utf8"));
+      if (pkg?.name === "rx-claude-matrix-bridge") return String(pkg.version || "0.0.0");
+    } catch {
+    }
+    const parent = dirname(d);
+    if (parent === d) break;
+    d = parent;
+  }
+  return "0.0.0";
+}
 var TYPING_DIR = join(STATE_DIR, "typing");
 var LAST_PROMPT_DIR = join(STATE_DIR, "last-tui-prompt");
 var LAST_MATRIX_DIR = join(STATE_DIR, "last-matrix-msg");
@@ -701,6 +718,7 @@ async function tryClaimPid() {
   }
   await fs.mkdir(dirname(PID_FILE), { recursive: true });
   await fs.writeFile(PID_FILE, String(process.pid));
+  await fs.writeFile(VERSION_FILE, DAEMON_VERSION);
   return true;
 }
 async function releasePid() {

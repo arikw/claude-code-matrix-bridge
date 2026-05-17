@@ -121,6 +121,28 @@ async function clearNeedsSetupFlag(): Promise<void> {
 
 // ---------- daemon ensure ----------
 
+const VERSION_FILE = join(STATE_DIR, 'daemon.version')
+
+// Walk up from __dirname looking for our package.json so the version is
+// read from a single source of truth (package.json) at startup. Handles
+// both dev layout (server.ts at repo root) and bundled layout
+// (dist/server.js one level down).
+function readOwnVersion(): string {
+  let d = __dirname
+  for (let i = 0; i < 5; i++) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(d, 'package.json'), 'utf8'))
+      if (pkg?.name === 'rx-claude-matrix-bridge') return String(pkg.version || '0.0.0')
+    } catch {}
+    const parent = dirname(d)
+    if (parent === d) break
+    d = parent
+  }
+  return '0.0.0'
+}
+
+const OWN_VERSION = readOwnVersion()
+
 async function daemonAlive(): Promise<boolean> {
   try {
     const pid = Number((await fs.readFile(PID_FILE, 'utf8')).trim())
@@ -128,6 +150,35 @@ async function daemonAlive(): Promise<boolean> {
     process.kill(pid, 0) // throws if dead
     return true
   } catch {
+    return false
+  }
+}
+
+async function daemonVersion(): Promise<string> {
+  try { return (await fs.readFile(VERSION_FILE, 'utf8')).trim() } catch { return '' }
+}
+
+// Kill the running daemon if its version doesn't match ours. Called
+// before connecting so a plugin update reliably replaces the in-flight
+// daemon with the new code. Returns true if the old daemon was killed.
+async function killStaleDaemon(): Promise<boolean> {
+  if (!(await daemonAlive())) return false
+  const running = await daemonVersion()
+  if (running === OWN_VERSION) return false
+  try {
+    const pid = Number((await fs.readFile(PID_FILE, 'utf8')).trim())
+    if (!pid) return false
+    await log('warn', `stale daemon pid=${pid} version=${running || '(unknown)'} mine=${OWN_VERSION} → SIGTERM`)
+    process.kill(pid, 'SIGTERM')
+    for (let i = 0; i < 50; i++) {
+      await new Promise((r) => setTimeout(r, 100))
+      if (!(await daemonAlive())) return true
+    }
+    // Still alive after 5s — escalate.
+    try { process.kill(pid, 'SIGKILL') } catch {}
+    return true
+  } catch (e: any) {
+    await log('warn', `killStaleDaemon err=${e?.message ?? e}`)
     return false
   }
 }
@@ -409,6 +460,9 @@ async function main(): Promise<void> {
     await log('warn', `needs-setup: ${cfgCheck.reason}`)
   } else {
     await clearNeedsSetupFlag()
+    // Replace a running daemon if it's from an older plugin version
+    // (post-update). Then spawn if no daemon is present.
+    await killStaleDaemon()
     if (!(await daemonAlive())) {
       await spawnDaemon()
     }
@@ -483,7 +537,7 @@ async function main(): Promise<void> {
     `\n\nUntil setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) will refuse with the same hint. Tell the user to run the setup script in their own terminal.`
 
   const mcp = new Server(
-    { name: 'matrix-bridge', version: '0.4.6' },
+    { name: 'matrix-bridge', version: OWN_VERSION },
     {
       capabilities: {
         tools: {},
