@@ -15451,7 +15451,7 @@ var StdioServerTransport = class {
 // server.ts
 import { spawn } from "node:child_process";
 import * as net from "node:net";
-import { promises as fs, readFileSync, existsSync } from "node:fs";
+import { promises as fs, readFileSync, readdirSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15570,6 +15570,42 @@ function readOwnVersion() {
   return "0.0.0";
 }
 var OWN_VERSION = readOwnVersion();
+function compareSemver(a, b) {
+  const parse3 = (s) => {
+    const m = /^(\d+)\.(\d+)\.(\d+)/.exec(s);
+    return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0];
+  };
+  const [a1, a2, a3] = parse3(a);
+  const [b1, b2, b3] = parse3(b);
+  return a1 - b1 || a2 - b2 || a3 - b3;
+}
+function getLatestInstalledVersion() {
+  let latest = OWN_VERSION;
+  try {
+    const cacheRoot = join(homedir(), ".claude", "plugins", "cache");
+    const owners = readdirSync(cacheRoot, { withFileTypes: true }).filter((d) => d.isDirectory());
+    for (const owner of owners) {
+      const plugDir = join(cacheRoot, owner.name, "rx-claude-matrix-bridge");
+      let versions;
+      try {
+        versions = readdirSync(plugDir, { withFileTypes: true }).filter((d) => d.isDirectory() && /^\d+\.\d+\.\d+$/.test(d.name)).map((d) => d.name);
+      } catch {
+        continue;
+      }
+      for (const v of versions) {
+        if (compareSemver(v, latest) > 0) latest = v;
+      }
+    }
+  } catch {
+  }
+  return latest;
+}
+var LATEST_INSTALLED_VERSION = getLatestInstalledVersion();
+var SERVER_IS_STALE = compareSemver(OWN_VERSION, LATEST_INSTALLED_VERSION) < 0;
+var STALE_MCP_FLAG = join(STATE_DIR, "stale-mcp");
+function staleMessage() {
+  return `MATRIX-BRIDGE: this Claude Code session is running plugin version ${OWN_VERSION}, but a newer version (${LATEST_INSTALLED_VERSION}) is installed on disk. Fully EXIT Claude Code (not just /mcp reconnect) and relaunch with \`claude --dangerously-load-development-channels server:matrix-bridge\` to pick it up.`;
+}
 async function daemonAlive() {
   try {
     const pid = Number((await fs.readFile(PID_FILE, "utf8")).trim());
@@ -15816,6 +15852,19 @@ async function main() {
   };
   await log("debug", `STARTUP_DUMP ${JSON.stringify(dump)}`);
   await log("info", `session_id source=${dump.sid_source} sid=${session_id}`);
+  if (SERVER_IS_STALE) {
+    try {
+      await fs.mkdir(STATE_DIR, { recursive: true });
+      await fs.writeFile(STALE_MCP_FLAG, staleMessage() + "\n");
+    } catch {
+    }
+    await log("warn", `stale MCP server: own=${OWN_VERSION} latest=${LATEST_INSTALLED_VERSION}`);
+  } else {
+    try {
+      await fs.unlink(STALE_MCP_FLAG);
+    } catch {
+    }
+  }
   let needsSetup = false;
   let needsSetupReason = "";
   const cfgCheck = await checkConfigPresence();
@@ -15883,6 +15932,11 @@ Your terminal output never reaches the user; only reply tool delivers messages b
 ` + setupCommandHint() + `
 
 Until setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) will refuse with the same hint. Tell the user to run the setup script in their own terminal.`;
+  const instructions = SERVER_IS_STALE ? `STALE MATRIX-BRIDGE MCP SERVER.
+
+${staleMessage()}
+
+All bridge tools will refuse until the user fully exits and relaunches Claude Code.` : needsSetup ? setupInstructions : baseInstructions;
   const mcp = new Server(
     { name: "matrix-bridge", version: OWN_VERSION },
     {
@@ -15890,7 +15944,7 @@ Until setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) w
         tools: {},
         experimental: { "claude/channel": {} }
       },
-      instructions: needsSetup ? setupInstructions : baseInstructions
+      instructions
     }
   );
   mcp.oninitialized = () => {
@@ -15962,6 +16016,9 @@ Until setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) w
   mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     const args = req.params.arguments ?? {};
     await log("debug", `DBG tool-call sid=${session_id} tool=${req.params.name} args=${JSON.stringify(args).slice(0, 200)}`);
+    if (SERVER_IS_STALE) {
+      return { isError: true, content: [{ type: "text", text: staleMessage() }] };
+    }
     if (needsSetup) {
       return { isError: true, content: [{ type: "text", text: setupCommandHint() }] };
     }

@@ -13,6 +13,15 @@ session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
 
 STATE_DIR="${HOME}/.claude/channels/rx-claude-matrix-bridge"
 
+# Stale-MCP indicator: surface BEFORE anything else. If a newer plugin
+# version is installed on disk than the one Claude Code currently has
+# loaded (post `claude plugin update` without restart), every tool call
+# refuses — the user has to know to fully restart Claude Code.
+if [[ -f "${STATE_DIR}/stale-mcp" ]]; then
+  printf '🔄 mx:restart-claude-code'
+  exit 0
+fi
+
 # Needs-setup indicator: surface BEFORE checking for a link, so the user
 # sees ⚙ even on an unlinked fresh TUI when config.env is missing.
 if [[ -f "${STATE_DIR}/needs-setup" ]]; then

@@ -9,9 +9,26 @@
 | | |
 |---|---|
 | **Status** | v0.4.8 — works against Claude Code 2.1.143; channels API still research preview |
+| **Platforms** | Linux + macOS. Windows works via WSL2 only — hooks + `bin/*` are bash scripts that won't run under cmd/PowerShell. |
 | **Requires** | Claude Code ≥ v2.1.80 (Channels API) · Node.js ≥ 20 · Matrix homeserver + bot account |
+| **Shell deps** | `bash`, `jq`, `curl`, `python3`, plus standard POSIX `awk` / `sed` / `tr` / `cat` |
 | **License** | MIT |
 | **Encryption** | Plaintext only (E2EE on roadmap) |
+
+> **Install the shell deps once** if they aren't already present:
+> ```bash
+> # Debian / Ubuntu / WSL
+> sudo apt-get install -y bash jq curl python3
+>
+> # Alpine
+> apk add bash jq curl python3
+>
+> # macOS (Homebrew)
+> brew install jq        # bash, curl, python3 ship with macOS or via Xcode tools
+> ```
+> Node.js: install whatever flow you prefer ([nvm](https://github.com/nvm-sh/nvm),
+> [fnm](https://github.com/Schniz/fnm), `apt install nodejs`, etc.) — must be
+> ≥ 20 so `dist/server.js` runs under the ESM bundle.
 
 > ⚠ **THIS BRIDGE REQUIRES A LAUNCH FLAG.** Claude Code must be started with
 > `--dangerously-load-development-channels server:matrix-bridge` (see step 5). Without
@@ -330,6 +347,7 @@ plugin-root                            # absolute path to repo (self-locate)
 
 | Symptom | Check |
 |---|---|
+| StatusLine shows `🔄 mx:restart-claude-code` | A newer plugin version is installed on disk than the one Claude Code currently has loaded — happens after `claude plugin update` without a full restart. Fully exit Claude Code (not just `/mcp` reconnect) and relaunch with the channels flag. |
 | StatusLine shows `⚙ mx:needs-setup` | `config.env` missing or has placeholder values. Run `bash /path/to/repo/bin/mx-setup` and relaunch Claude Code. |
 | `/mx-link-chat` returns "bridge is not configured" | Same as above. The error message includes the absolute path to `bin/mx-setup`. |
 | StatusLine shows `⛓️‍💥` | Claude Code launched without `--dangerously-load-development-channels server:matrix-bridge`. Relaunch with it. |

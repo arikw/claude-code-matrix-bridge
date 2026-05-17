@@ -14,7 +14,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import { spawn } from 'node:child_process'
 import * as net from 'node:net'
-import { promises as fs, readFileSync, existsSync } from 'node:fs'
+import { promises as fs, readFileSync, readdirSync, existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -151,6 +151,59 @@ function readOwnVersion(): string {
 }
 
 const OWN_VERSION = readOwnVersion()
+
+// Compare two semver strings (X.Y.Z form only — what we ship). Returns
+// negative if a<b, 0 if equal, positive if a>b. Non-semver values sort
+// as "0.0.0".
+function compareSemver(a: string, b: string): number {
+  const parse = (s: string) => {
+    const m = /^(\d+)\.(\d+)\.(\d+)/.exec(s)
+    return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0]
+  }
+  const [a1, a2, a3] = parse(a)
+  const [b1, b2, b3] = parse(b)
+  return a1 - b1 || a2 - b2 || a3 - b3
+}
+
+// Walk the plugin cache to find the highest installed version of THIS
+// plugin. Used to detect that the user ran `claude plugin update` after
+// this MCP server was already spawned by Claude Code — in which case
+// the in-process bundle is stale and tool calls should refuse with a
+// clear "restart Claude Code" message instead of silently serving old
+// behavior to the user.
+function getLatestInstalledVersion(): string {
+  let latest = OWN_VERSION
+  try {
+    const cacheRoot = join(homedir(), '.claude', 'plugins', 'cache')
+    const owners = readdirSync(cacheRoot, { withFileTypes: true }).filter((d) => d.isDirectory())
+    for (const owner of owners) {
+      const plugDir = join(cacheRoot, owner.name, 'rx-claude-matrix-bridge')
+      let versions: string[]
+      try {
+        versions = readdirSync(plugDir, { withFileTypes: true })
+          .filter((d) => d.isDirectory() && /^\d+\.\d+\.\d+$/.test(d.name))
+          .map((d) => d.name)
+      } catch { continue }
+      for (const v of versions) {
+        if (compareSemver(v, latest) > 0) latest = v
+      }
+    }
+  } catch {}
+  return latest
+}
+
+const LATEST_INSTALLED_VERSION = getLatestInstalledVersion()
+const SERVER_IS_STALE = compareSemver(OWN_VERSION, LATEST_INSTALLED_VERSION) < 0
+const STALE_MCP_FLAG = join(STATE_DIR, 'stale-mcp')
+
+function staleMessage(): string {
+  return (
+    `MATRIX-BRIDGE: this Claude Code session is running plugin version ${OWN_VERSION}, ` +
+    `but a newer version (${LATEST_INSTALLED_VERSION}) is installed on disk. ` +
+    `Fully EXIT Claude Code (not just /mcp reconnect) and relaunch with ` +
+    `\`claude --dangerously-load-development-channels server:matrix-bridge\` to pick it up.`
+  )
+}
 
 async function daemonAlive(): Promise<boolean> {
   try {
@@ -449,6 +502,21 @@ async function main(): Promise<void> {
   await log('debug', `STARTUP_DUMP ${JSON.stringify(dump)}`)
   await log('info', `session_id source=${dump.sid_source} sid=${session_id}`)
 
+  // Staleness check: if a newer plugin version is installed on disk
+  // than the one we were spawned from, the user did `claude plugin
+  // update` after this MCP server started. The in-process bundle is
+  // stale — refuse tool calls with a "restart Claude Code" message so
+  // the user doesn't silently get old behavior.
+  if (SERVER_IS_STALE) {
+    try {
+      await fs.mkdir(STATE_DIR, { recursive: true })
+      await fs.writeFile(STALE_MCP_FLAG, staleMessage() + '\n')
+    } catch {}
+    await log('warn', `stale MCP server: own=${OWN_VERSION} latest=${LATEST_INSTALLED_VERSION}`)
+  } else {
+    try { await fs.unlink(STALE_MCP_FLAG) } catch {}
+  }
+
   // Config presence check. If missing or placeholder, set needsSetup so
   // tool calls return an onboarding hint and statusLine shows ⚙. Daemon
   // spawn + connection are skipped entirely — daemon would crash on
@@ -540,6 +608,13 @@ async function main(): Promise<void> {
     setupCommandHint() +
     `\n\nUntil setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) will refuse with the same hint. Tell the user to run the setup script in their own terminal.`
 
+  // Pick the most relevant warning. Staleness takes precedence — if the
+  // server is running old code, no other warning matters until the user
+  // restarts Claude Code.
+  const instructions = SERVER_IS_STALE
+    ? `STALE MATRIX-BRIDGE MCP SERVER.\n\n${staleMessage()}\n\nAll bridge tools will refuse until the user fully exits and relaunches Claude Code.`
+    : (needsSetup ? setupInstructions : baseInstructions)
+
   const mcp = new Server(
     { name: 'matrix-bridge', version: OWN_VERSION },
     {
@@ -547,7 +622,7 @@ async function main(): Promise<void> {
         tools: {},
         experimental: { 'claude/channel': {} },
       },
-      instructions: needsSetup ? setupInstructions : baseInstructions,
+      instructions,
     },
   )
 
@@ -639,6 +714,9 @@ async function main(): Promise<void> {
   mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     const args = (req.params.arguments ?? {}) as Record<string, unknown>
     await log('debug', `DBG tool-call sid=${session_id} tool=${req.params.name} args=${JSON.stringify(args).slice(0, 200)}`)
+    if (SERVER_IS_STALE) {
+      return { isError: true, content: [{ type: 'text' as const, text: staleMessage() }] }
+    }
     if (needsSetup) {
       return { isError: true, content: [{ type: 'text' as const, text: setupCommandHint() }] }
     }
