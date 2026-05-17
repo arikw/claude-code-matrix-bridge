@@ -1,6 +1,6 @@
 {
   "name": "rx-claude-matrix-bridge",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "Matrix as a Claude Code Channel. Always-on Matrix daemon + per-TUI MCP relay. Per-session room routing via link_chat tool. Headless `claude --print --resume` fallback for offline TUIs so messages never get lost.",
   "keywords": ["matrix", "channel", "chat", "bridge", "daemon"],
   "author": {

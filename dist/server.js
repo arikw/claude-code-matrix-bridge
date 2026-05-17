@@ -15722,7 +15722,8 @@ async function readSessionFromHook(timeoutMs = 8e3, verbose = false) {
 async function main() {
   await fs.mkdir(STATE_DIR, { recursive: true });
   try {
-    await fs.writeFile(join(STATE_DIR, "plugin-root"), __dirname);
+    const pluginRoot = __dirname.endsWith("/dist") || __dirname.endsWith("\\dist") ? dirname(__dirname) : __dirname;
+    await fs.writeFile(join(STATE_DIR, "plugin-root"), pluginRoot);
   } catch {
   }
   const quickHook = await readSessionFromHook(300, true);
@@ -15836,7 +15837,7 @@ Your terminal output never reaches the user; only reply tool delivers messages b
 
 Until setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) will refuse with the same hint. Tell the user to run the setup script in their own terminal.`;
   const mcp = new Server(
-    { name: "matrix-bridge", version: "0.4.4" },
+    { name: "matrix-bridge", version: "0.4.5" },
     {
       capabilities: {
         tools: {},

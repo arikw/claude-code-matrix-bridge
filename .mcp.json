@@ -4,7 +4,7 @@
       "command": "bash",
       "args": [
         "-c",
-        "ROOT=\"${CLAUDE_PLUGIN_ROOT:-}\"; [ -z \"$ROOT\" ] && ROOT=$(cat ~/.claude/channels/rx-claude-matrix-bridge/plugin-root 2>/dev/null); [ -z \"$ROOT\" ] && ROOT=\"$PWD\"; if [ -f \"$ROOT/dist/server.js\" ]; then exec node \"$ROOT/dist/server.js\"; elif [ -f \"$ROOT/server.ts\" ]; then cd \"$ROOT\" && exec npx --yes tsx server.ts; else echo \"matrix-bridge: cannot locate server (ROOT=$ROOT). Check plugin install or run npm run build in the repo.\" >&2; exit 1; fi"
+        "ROOT=\"${CLAUDE_PLUGIN_ROOT:-}\"; [ -z \"$ROOT\" ] && ROOT=$(cat ~/.claude/channels/rx-claude-matrix-bridge/plugin-root 2>/dev/null); [ -z \"$ROOT\" ] && ROOT=\"$PWD\"; if [ -f \"$ROOT/dist/server.js\" ]; then exec node \"$ROOT/dist/server.js\"; elif [ -f \"$ROOT/server.js\" ]; then exec node \"$ROOT/server.js\"; elif [ -f \"$ROOT/server.ts\" ]; then cd \"$ROOT\" && exec npx --yes tsx server.ts; elif [ -f \"$ROOT/../dist/server.js\" ]; then exec node \"$ROOT/../dist/server.js\"; else echo \"matrix-bridge: cannot locate server (ROOT=$ROOT). Tried: $ROOT/dist/server.js, $ROOT/server.js, $ROOT/server.ts, $ROOT/../dist/server.js. Reinstall the plugin or run 'npm run build' in the repo.\" >&2; exit 1; fi"
       ]
     }
   }

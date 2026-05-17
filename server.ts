@@ -329,10 +329,16 @@ async function main(): Promise<void> {
   await fs.mkdir(STATE_DIR, { recursive: true })
 
   // Self-locate: write our installation root so slash-command bash scripts
-  // can find bin/ without relying on CLAUDE_PLUGIN_ROOT (unset in dev mode
-  // without --plugin-dir).
+  // and the .mcp.json fallback chain can find bin/ + dist/ without relying
+  // on CLAUDE_PLUGIN_ROOT (CC doesn't always set it for the .mcp.json MCP
+  // launcher). In the production bundle, __dirname is <plugin>/dist — strip
+  // that suffix so the file always points at the plugin's top dir.
   try {
-    await fs.writeFile(join(STATE_DIR, 'plugin-root'), __dirname)
+    const pluginRoot =
+      __dirname.endsWith('/dist') || __dirname.endsWith('\\dist')
+        ? dirname(__dirname)
+        : __dirname
+    await fs.writeFile(join(STATE_DIR, 'plugin-root'), pluginRoot)
   } catch {}
 
   // Determine session_id + cwd. Three sources, in order:
@@ -477,7 +483,7 @@ async function main(): Promise<void> {
     `\n\nUntil setup is complete, all bridge tools (reply, link_chat, list_rooms, etc.) will refuse with the same hint. Tell the user to run the setup script in their own terminal.`
 
   const mcp = new Server(
-    { name: 'matrix-bridge', version: '0.4.4' },
+    { name: 'matrix-bridge', version: '0.4.5' },
     {
       capabilities: {
         tools: {},
