@@ -150,9 +150,29 @@ OWNER_LOCALPART="${OWNER_LOCALPART%%:*}"
 
 # ---------- bot-create branch ----------
 
+# Probe the homeserver implementation BEFORE asking the user about the
+# Synapse-only bot-create path. /_matrix/client/versions advertises the
+# server name + version in `net.zemos.msc4383.server.name` on
+# Conduit-family servers (Tuwunel, Conduwuit, Conduit); Synapse omits
+# that key. If it's not Synapse, the bot-create option won't work, so
+# skip the question entirely.
+SERVER_NAME=''
+VERSIONS_RESP=$(curl -sS -L --max-time 15 "${HOMESERVER}/_matrix/client/versions" 2>/dev/null || true)
+SERVER_NAME=$(printf '%s' "$VERSIONS_RESP" | jq -r '.["net.zemos.msc4383.server"].name // .server.name // empty' 2>/dev/null)
+
 CREATE_BOT='no'
-if confirm "Create the bot account now via Synapse admin API? (Requires the owner to be a Synapse admin)" n; then
-  CREATE_BOT='yes'
+if [[ -z "$SERVER_NAME" ]]; then
+  # Synapse doesn't advertise server name via that experimental key, so an
+  # empty value is the right signal that this MIGHT be Synapse.
+  if confirm "Create the bot account now via Synapse admin API? (Requires the owner to be a Synapse admin)" n; then
+    CREATE_BOT='yes'
+  fi
+else
+  echo
+  echo "Detected homeserver: $SERVER_NAME — bot-create via Synapse admin API not supported here."
+  echo "Skipping bot-create step. The bot account must already exist before continuing."
+  echo "Create it manually (e.g. via Element web register, or your homeserver's admin tool), then provide its password below."
+  echo
 fi
 
 BOT_PASSWORD=''
@@ -172,7 +192,7 @@ if [[ "$CREATE_BOT" == "yes" ]]; then
     -H "Authorization: Bearer $OWNER_TOKEN" \
     "${HOMESERVER}/_synapse/admin/v1/server_version")
   if [[ "$ADMIN_PROBE" != "200" ]]; then
-    echo "error: $OWNER is not a Synapse admin (or homeserver is not Synapse)." >&2
+    echo "error: $OWNER is not a Synapse admin (or homeserver is not Synapse — got http=$ADMIN_PROBE)." >&2
     echo "Hint: log in as a Synapse admin to grant admin, then re-run." >&2
     echo "Or skip the bot-create step and create the bot manually." >&2
     exit 1
