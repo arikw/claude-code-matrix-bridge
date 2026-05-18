@@ -410,7 +410,7 @@ async function runHeadless(link, msg, roomId) {
     "--",
     msg
   ];
-  const env = { ...process.env };
+  const env = { ...process.env, MX_HEADLESS: "1" };
   if (env.MX_CLAUDE_PERMISSION_MODE) {
     args.splice(args.length - 2, 0, "--permission-mode", env.MX_CLAUDE_PERMISSION_MODE);
   }
