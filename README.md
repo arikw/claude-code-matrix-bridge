@@ -31,7 +31,7 @@
 > ≥ 20 so `dist/server.js` runs under the ESM bundle.
 
 > ⚠ **THIS BRIDGE REQUIRES A LAUNCH FLAG.** Claude Code must be started with
-> `--dangerously-load-development-channels server:matrix-bridge` (see step 3). Without
+> `--dangerously-load-development-channels server:matrix-bridge` (see step 2). Without
 > it, MCP tools work but matrix → TUI inbound is silently dropped. The bridge
 > detects the missing flag and surfaces a `⛓️‍💥` glyph in the statusLine + a
 > warning in `/mx-link-chat` output, but you'll still need to relaunch Claude Code.
@@ -79,17 +79,7 @@ npm run build      # produces dist/server.js + dist/daemon.js
 The runtime auto-detects: `dist/server.js` if present (production / built dev
 checkout), otherwise spawns `tsx server.ts` directly (unbuilt dev checkout).
 
-### 2. Enable Channels API in Claude Code settings
-
-Add to `~/.claude/settings.json`:
-
-```json
-{ "channelsEnabled": true }
-```
-
-(Default may be blocked on Team/Enterprise tiers; check with your admin.)
-
-### 3. Launch Claude Code with the channels flag
+### 2. Launch Claude Code with the channels flag
 
 ```bash
 cd /path/to/your/project
@@ -103,8 +93,15 @@ daemon over `~/.claude/channels/rx-claude-matrix-bridge/daemon.sock`.
 > ```bash
 > alias claude='command claude --dangerously-load-development-channels server:matrix-bridge'
 > ```
+> (the setup wizard in step 3 will print this exact line tailored to your shell's rc file)
 
-### 4. Run `/mx-link-chat` — first-run onboarding kicks in automatically
+> The matching persistent setting (`"channelsEnabled": true` in
+> `~/.claude/settings.json`) is set automatically by the setup wizard in step 3,
+> so you don't need to edit settings.json yourself. On Team/Enterprise tiers
+> the setting may be blocked by your admin — check with them if `/mx-link-chat`
+> still warns about channels-capable=false after setup.
+
+### 3. Run `/mx-link-chat` — first-run onboarding kicks in automatically
 
 Inside the TUI, run:
 
@@ -146,7 +143,7 @@ to the room.
 > (Conduit / Conduwuit / Tuwunel / Dendrite / hosted matrix.org / etc.), create
 > the bot manually first.
 
-### 5. Enable the statusLine indicator (optional but recommended)
+### 4. Enable the statusLine indicator (optional but recommended)
 
 Inside the TUI, run:
 
