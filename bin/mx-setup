@@ -85,12 +85,16 @@ matrix_login() {
   # matrix_login <homeserver> <localpart> <password>
   local hs="$1" user="$2" pw="$3"
   local payload resp_body status tok err msg
+  # NOTE: do NOT pin device_id. Tuwunel/ruma panics with "no entry found
+  # for key" when reusing an existing device record whose stored fields
+  # mismatch a newer ruma version (observed against Tuwunel 1.6.2 +
+  # ruma 202cedf). Letting the server generate a fresh device id avoids
+  # the panic, matches Element's behavior, and is the safe default.
   payload=$(jq -nc \
     --arg u "$user" --arg p "$pw" \
     '{type:"m.login.password",
       identifier:{type:"m.id.user",user:$u},
       password:$p,
-      device_id:"matrix-bridge",
       initial_device_display_name:"rx-claude-matrix-bridge"}')
   # -L follows HTTP→HTTPS redirects (typical for non-https homeserver URLs).
   # Capture status code + body separately so we can surface a useful error
