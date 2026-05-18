@@ -84,7 +84,7 @@ require_user_id() {
 matrix_login() {
   # matrix_login <homeserver> <localpart> <password>
   local hs="$1" user="$2" pw="$3"
-  local payload resp tok err msg
+  local payload resp_body status tok err msg
   payload=$(jq -nc \
     --arg u "$user" --arg p "$pw" \
     '{type:"m.login.password",
@@ -92,16 +92,34 @@ matrix_login() {
       password:$p,
       device_id:"matrix-bridge",
       initial_device_display_name:"rx-claude-matrix-bridge"}')
-  resp=$(curl -sS -X POST \
+  # -L follows HTTP→HTTPS redirects (typical for non-https homeserver URLs).
+  # Capture status code + body separately so we can surface a useful error
+  # when the response isn't JSON (HTML redirect page, 404, etc.).
+  resp_body=$(curl -sS -L -X POST \
     -H 'Content-Type: application/json' \
     --max-time 30 \
     --data-binary "$payload" \
-    "${hs}/_matrix/client/v3/login")
-  tok=$(printf '%s' "$resp" | jq -r '.access_token // empty')
+    -w $'\n__HTTP_CODE__:%{http_code}\n__FINAL_URL__:%{url_effective}' \
+    "${hs}/_matrix/client/v3/login" 2>&1)
+  status=$(printf '%s' "$resp_body" | sed -n 's/^__HTTP_CODE__://p' | tail -1)
+  final_url=$(printf '%s' "$resp_body" | sed -n 's/^__FINAL_URL__://p' | tail -1)
+  # Strip the metadata lines from the body before passing to jq.
+  body=$(printf '%s' "$resp_body" | sed '/^__HTTP_CODE__:/d;/^__FINAL_URL__:/d')
+  tok=$(printf '%s' "$body" | jq -r '.access_token // empty' 2>/dev/null)
   if [[ -z "$tok" ]]; then
-    err=$(printf '%s' "$resp" | jq -r '.errcode // "unknown"')
-    msg=$(printf '%s' "$resp" | jq -r '.error // "(no error message)"')
-    echo "login failed — $err: $msg" >&2
+    err=$(printf '%s' "$body" | jq -r '.errcode // empty' 2>/dev/null)
+    msg=$(printf '%s' "$body" | jq -r '.error // empty' 2>/dev/null)
+    {
+      echo "login failed (http=$status)"
+      [[ -n "$err" || -n "$msg" ]] && echo "  matrix: ${err:-(no errcode)} — ${msg:-(no message)}"
+      if [[ "$final_url" != "${hs}/_matrix/client/v3/login" ]]; then
+        echo "  note: request was redirected to: $final_url"
+        echo "  hint: try using the redirect target's homeserver URL (probably https://${hs#*://})"
+      fi
+      echo "  raw response (first 500 bytes):"
+      printf '%s' "$body" | head -c 500 | sed 's/^/    /'
+      echo ""
+    } >&2
     return 1
   fi
   printf '%s' "$tok"
