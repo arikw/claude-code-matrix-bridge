@@ -1,0 +1,15 @@
+title: RX Claude Code Matrix Bridge
+description: Live two-way Matrix ↔ Claude Code TUI bridge via the Channels API research preview.
+theme: jekyll-theme-cayman
+show_downloads: true
+url: https://arikw.github.io
+baseurl: /claude-code-matrix-bridge
+repository: arikw/claude-code-matrix-bridge
+
+# Hide build artifacts from the rendered site
+exclude:
+  - "*.zip"
+  - "*.gem"
+  - vendor
+  - Gemfile
+  - Gemfile.lock
