@@ -62,7 +62,7 @@ additional_context=""
 # ISO 8601 UTC timestamps are lexically sortable.
 if [[ -n "$last_matrix" ]] && { [[ -z "$old_tui" ]] || [[ "$last_matrix" > "$old_tui" ]]; }; then
   since_label="${old_tui:-the start of this session}"
-  additional_context="[matrix-bridge channel-switch] The user was on Matrix since their last TUI prompt at ${since_label}. Before answering, give a brief 3-6 bullet recap of Matrix activity since that time using your existing session context, then respond to the prompt."
+  additional_context="[matrix-bridge recap-since ${since_label}] The user was on Matrix since their last TUI prompt at ${since_label}. Before answering: 1. Give a brief 3-6 bullet recap of Matrix activity since that time using your existing session context. 2. Classify the user's incoming prompt: substantive request, OR presence-only ping (short greetings like \"hi\", \"back\", \"I'm here\", \"ping\", \"you there\", \"what's up\", etc.). 3. If presence-only ping: reply with ONLY the recap plus one final line stating whether your attention is required (a pending question to answer, a decision to confirm, an error to react to) or whether they can resume what they were doing. Do NOT invent follow-up questions; do NOT ask \"what would you like next?\". 4. If substantive: give the recap, then handle the request normally."
 fi
 
 # ---------- update last-tui-prompt ----------

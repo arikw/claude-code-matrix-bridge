@@ -435,11 +435,17 @@ async function deliverInbound(roomId: string, evt: any): Promise<void> {
     if (switched) {
       const sinceLabel = prevMatrix ?? 'the start of this session'
       body =
-        `[matrix-bridge channel-switch] The user was active on the TUI since their ` +
-        `last matrix message at ${sinceLabel}. Before answering, give a brief 3-6 ` +
-        `bullet recap of TUI activity since that time using your existing session ` +
-        `context, then respond to the owner's message below.\n\n${body}`
-      await log('info', `channel-switch tui→matrix sid=${sid} prevMatrix=${prevMatrix ?? '(none)'} lastTui=${lastTui}`)
+        `[matrix-bridge recap-since ${sinceLabel}] The user was active on the TUI since ` +
+        `their last matrix message at ${sinceLabel}. Before answering:\n` +
+        `1. Give a brief 3-6 bullet recap of TUI activity since that time using your existing session context.\n` +
+        `2. Classify the user's incoming message below: substantive request, OR presence-only ping ` +
+        `(short greetings like "hi", "back", "I'm here", "ping", "you there", "what's up", etc.).\n` +
+        `3. If presence-only ping: reply with ONLY the recap plus one final line stating whether your ` +
+        `attention is required (a pending question to answer, a decision to confirm, an error to react ` +
+        `to) or whether they can resume what they were doing. Do NOT invent follow-up questions; do ` +
+        `NOT ask "what would you like next?".\n` +
+        `4. If substantive: give the recap, then handle the request normally.\n\n${body}`
+      await log('info', `recap-since tui→matrix sid=${sid} prevMatrix=${prevMatrix ?? '(none)'} lastTui=${lastTui}`)
     }
     await writeLastMatrixMsg(sid, evtIso)
 
