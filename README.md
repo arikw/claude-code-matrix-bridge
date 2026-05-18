@@ -79,50 +79,96 @@ npm run build      # produces dist/server.js + dist/daemon.js
 The runtime auto-detects: `dist/server.js` if present (production / built dev
 checkout), otherwise spawns `tsx server.ts` directly (unbuilt dev checkout).
 
-### 2. Create a Matrix account for the bot
+### 2. Enable Channels API in Claude Code settings
 
-You need a **dedicated** matrix account for the bot — separate from your personal
-account. Two ways:
+Add to `~/.claude/settings.json`:
 
-- **Manual**: register at [element.io](https://app.element.io) or via your
-  homeserver's registration page. Note the bot user ID (`@yourbot:server.tld`)
-  and password, then proceed to step 3.
-- **Automatic** (Synapse only, if your owner account is a Synapse admin):
-  let the wizard create it for you. Skip ahead to step 3 and answer "yes" when
-  asked "Create the bot account now?".
-
-### 3. Run the setup wizard
-
-```bash
-bash /absolute/path/to/the/plugin/bin/mx-setup
+```json
+{ "channelsEnabled": true }
 ```
 
-The absolute path depends on how you installed:
-- **Plugin marketplace install**: `~/.claude/plugins/marketplaces/arikw/rx-claude-matrix-bridge/bin/mx-setup`
-- **Git clone**: `/path/where/you/cloned/claude-code-matrix-bridge/bin/mx-setup`
+(Default may be blocked on Team/Enterprise tiers; check with your admin.)
 
-(If you forget the exact path, launch Claude Code once with the channels flag and run
-`/mx-link-chat` — the bridge prints the correct absolute path in its setup hint.)
+### 3. Launch Claude Code with the channels flag
 
-The wizard prompts for homeserver / bot user / owner, optionally creates the
-bot account via the Synapse admin API (asks for the owner's password, verifies
-admin status, then sets the new bot password), performs a login to obtain the
-bot's access token, and writes `~/.config/rx-claude-matrix-bridge/config.env`
-(chmod 0600). Passwords are read with `read -s` — never echoed, never stored.
-Re-runs safely (existing values shown as defaults).
+```bash
+cd /path/to/your/project
+claude --dangerously-load-development-channels server:matrix-bridge
+```
 
-If the owner is **not** a Synapse admin (or the homeserver is not Synapse), the
-bot-create step bails with a clear message and you can re-run the wizard
-answering "no" to bot-create, then provide credentials for an account you
-created manually.
+The first launch auto-spawns the daemon. Subsequent TUIs connect to the running
+daemon over `~/.claude/channels/rx-claude-matrix-bridge/daemon.sock`.
 
-If the bridge MCP server is loaded but config is missing, the statusLine shows
-`⚙ mx:needs-setup` and any bridge tool call (e.g. via `/mx-link-chat`) returns
-the absolute path to `bin/mx-setup` for you to run.
+> **Make this permanent** — wrap Claude Code in a shell alias so you don't forget the flag:
+> ```bash
+> alias claude='command claude --dangerously-load-development-channels server:matrix-bridge'
+> ```
 
-#### Manual setup (alternative to the wizard)
+### 4. Run `/mx-link-chat` — first-run onboarding kicks in automatically
 
-If you'd rather configure by hand, copy the template and edit it:
+Inside the TUI, run:
+
+```
+/mx-link-chat
+```
+
+On a fresh install, the bridge has no Matrix credentials yet, so the slash command
+won't link anything — instead it prints a one-line setup instruction with the
+absolute path to `bin/mx-setup` for your install. Run that wizard in a separate
+terminal; it walks you through:
+
+- Bot Matrix user ID (`@yourbot:server.tld`)
+- Owner Matrix user ID (your personal account — the only sender allowed to drive Claude)
+- Bot password — wizard performs a one-shot login to obtain a long-lived access token
+- Optional: create the bot account itself via the Synapse admin API (only offered if the homeserver is Synapse and the owner is admin; skipped silently on Conduit/Tuwunel/etc.)
+
+Wizard writes `~/.config/rx-claude-matrix-bridge/config.env` (chmod 0600). Passwords
+are read with `read -s` and never stored. Re-run safely — existing values become
+prompt defaults.
+
+After the wizard finishes, **fully exit and relaunch Claude Code** (the MCP server
+loaded its config at startup), then run `/mx-link-chat` again. This time it shows
+an interactive picker:
+
+- existing rooms the bot has joined (with current link status)
+- "create new room" → bot creates one, invites `MATRIX_OWNER`, returns the room id
+- accept the invite in your Matrix client to start receiving messages
+
+After linking, every message in that room routes to **this session_id**. On
+`claude --resume <session_id>` later, routing resumes. If the TUI is dead, the
+daemon spawns headless `claude --print --resume <sid>` and posts the reply back
+to the room.
+
+> **Don't have a bot Matrix account yet?** Register one separately (via
+> [element.io](https://app.element.io) or your homeserver's UI / admin tool)
+> *before* running the wizard. The wizard can only create accounts on Synapse
+> homeservers where your owner account is admin; for everything else
+> (Conduit / Conduwuit / Tuwunel / Dendrite / hosted matrix.org / etc.), create
+> the bot manually first.
+
+### 5. Enable the statusLine indicator (optional but recommended)
+
+Inside the TUI, run:
+
+```
+/mx-enable-statusline
+```
+
+Installs `🔗 mx:<room>` / `✏️` indicators into the current project's
+`.claude/settings.json`. The glyph also flips to other states so you spot problems
+immediately:
+
+| Glyph | Meaning |
+|---|---|
+| `🔗 mx:<room>` | Linked + healthy |
+| `✏️` | Owner is typing in the linked room |
+| `⛓️‍💥 mx:<room>` | Claude Code was launched without `--dangerously-load-development-channels server:matrix-bridge` (matrix → TUI inbound silently dropped) |
+| `⚙ mx:needs-setup` | `config.env` missing or has placeholder values (run `bin/mx-setup`) |
+| `🔄 mx:restart-claude-code` | Plugin was updated mid-session and the live MCP server is stale (fully restart Claude Code) |
+
+#### Power-user shortcut: manual setup (skip the wizard)
+
+If you prefer to write `config.env` by hand:
 
 ```bash
 mkdir -p ~/.config/rx-claude-matrix-bridge
@@ -131,16 +177,9 @@ chmod 0600 ~/.config/rx-claude-matrix-bridge/config.env
 $EDITOR ~/.config/rx-claude-matrix-bridge/config.env
 ```
 
-Required keys:
+Required keys: `MATRIX_HOMESERVER`, `MATRIX_USER_ID`, `MATRIX_ACCESS_TOKEN`, `MATRIX_OWNER`.
 
-```bash
-MATRIX_HOMESERVER=https://matrix.example.org
-MATRIX_USER_ID=@yourbot:example.org
-MATRIX_ACCESS_TOKEN=syt_...
-MATRIX_OWNER=@you:example.org
-```
-
-To get an access token manually:
+Get an access token via curl:
 
 ```bash
 HS=https://matrix.example.org
@@ -158,69 +197,7 @@ curl -s -X POST "${HS}/_matrix/client/v3/login" \
   | jq -r '.access_token'
 ```
 
-Verify the token:
-
-```bash
-. ~/.config/rx-claude-matrix-bridge/config.env
-curl -s "${MATRIX_HOMESERVER}/_matrix/client/v3/account/whoami" \
-  -H "Authorization: Bearer ${MATRIX_ACCESS_TOKEN}"
-# expect: {"user_id":"@yourbot:server.tld","device_id":"matrix-bridge"}
-```
-
-### 4. Enable Channels API in Claude Code settings
-
-Add to `~/.claude/settings.json`:
-
-```json
-{ "channelsEnabled": true }
-```
-
-(Default may be blocked on Team/Enterprise tiers; check with your admin.)
-
-### 5. Launch Claude Code with the channels flag
-
-```bash
-cd /path/to/your/project
-claude --dangerously-load-development-channels server:matrix-bridge
-```
-
-The first launch auto-spawns the daemon. Subsequent TUIs connect to the running
-daemon over `~/.claude/channels/rx-claude-matrix-bridge/daemon.sock`.
-
-> **Make this permanent** — wrap Claude Code in a shell alias so you don't forget the flag:
-> ```bash
-> alias claude='command claude --dangerously-load-development-channels server:matrix-bridge'
-> ```
-
-### 6. Enable the statusLine indicator (optional but recommended)
-
-Inside the TUI, run:
-
-```
-/mx-enable-statusline
-```
-
-This installs `🔗 mx:<room>` / `✏️` indicators into the current project's
-`.claude/settings.json`. When the channels flag is missing the glyph becomes
-`⛓️‍💥` so you see the problem immediately.
-
-### 7. Bind a session to a Matrix room
-
-In the TUI, run:
-
-```
-/mx-link-chat
-```
-
-Interactive picker:
-- shows all rooms the bot has joined + which are already linked
-- lets you pick an existing room or create a new one
-- if creating new, the bot invites `MATRIX_OWNER` automatically — accept the invite in your matrix client
-
-After linking, every message in that room routes to **this session_id**. On
-`claude --resume <session_id>` later, routing resumes. If the TUI is dead, the
-daemon spawns headless `claude --print --resume <sid>` and posts the reply back
-to the room.
+Then continue with step 4 (`/mx-link-chat`).
 
 ---
 
