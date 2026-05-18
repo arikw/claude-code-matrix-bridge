@@ -17,6 +17,16 @@ set -u
 STATE_DIR="${HOME}/.claude/channels/rx-claude-matrix-bridge"
 exec 2>>"${STATE_DIR}/hook.err" 2>/dev/null || true
 
+# Headless guard: daemon's runHeadless() sets MX_HEADLESS=1 in the spawn
+# env. Without this check, a matrix message → headless `claude --print`
+# fires THIS hook, which would mirror the matrix user's own message back
+# to the linked room as `[TUI] <their-own-text>` (an echo). Hook is also
+# a no-op for typing-pinger spawn + channel-switch detection in headless
+# context (no live TUI to recap to).
+if [[ "${MX_HEADLESS:-}" == "1" ]]; then
+  exit 0
+fi
+
 input=$(cat || true)
 command -v jq   >/dev/null 2>&1 || exit 0
 command -v curl >/dev/null 2>&1 || exit 0

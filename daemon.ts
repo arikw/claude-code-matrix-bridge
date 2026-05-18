@@ -520,12 +520,15 @@ async function runHeadless(link: Link, msg: string, roomId: string): Promise<voi
     '--add-dir', link.cwd,
     '--', msg,
   ]
-  const env = { ...process.env }
+  const env = { ...process.env, MX_HEADLESS: '1' }
   // permission mode: caller may have set MX_CLAUDE_PERMISSION_MODE
   if (env.MX_CLAUDE_PERMISSION_MODE) {
     args.splice(args.length - 2, 0, '--permission-mode', env.MX_CLAUDE_PERMISSION_MODE)
   }
 
+  // MX_HEADLESS tells the UserPromptSubmit hook to skip the [TUI]
+  // prompt-mirror — without it, every headless turn echoes the matrix
+  // user's message back to the room as `[TUI] <their-own-text>`.
   const child = spawn('claude', args, {
     cwd: link.cwd,
     env,
