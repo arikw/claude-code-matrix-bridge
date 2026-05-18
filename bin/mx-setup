@@ -345,6 +345,31 @@ echo "Wrote $CONFIG_FILE (chmod 0600) — preserved $(grep -cvE "${WIZARD_KEYS}|
 
 rm -f "$NEEDS_SETUP_FLAG" 2>/dev/null || true
 
+# ---------- enable Channels API in ~/.claude/settings.json ----------
+#
+# Channels API requires BOTH a persistent setting AND a launch flag.
+# We can set the setting; the launch flag has to be passed each time
+# Claude Code starts (no way around that — print a shell-alias one-liner
+# so the user can wire it once).
+
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+mkdir -p "$(dirname "$CLAUDE_SETTINGS")" 2>/dev/null || true
+if [[ -f "$CLAUDE_SETTINGS" ]]; then
+  ALREADY=$(jq -r '.channelsEnabled // empty' "$CLAUDE_SETTINGS" 2>/dev/null)
+  if [[ "$ALREADY" == "true" ]]; then
+    echo "✓ channelsEnabled already true in $CLAUDE_SETTINGS"
+  else
+    TMP_S=$(mktemp "${CLAUDE_SETTINGS}.XXXXXX")
+    jq '. + {channelsEnabled: true}' "$CLAUDE_SETTINGS" >"$TMP_S" 2>/dev/null \
+      && mv -f "$TMP_S" "$CLAUDE_SETTINGS" \
+      && echo "✓ set channelsEnabled=true in $CLAUDE_SETTINGS" \
+      || { rm -f "$TMP_S"; echo "⚠ couldn't merge channelsEnabled into $CLAUDE_SETTINGS (parse error?)" >&2; }
+  fi
+else
+  echo '{"channelsEnabled": true}' > "$CLAUDE_SETTINGS"
+  echo "✓ created $CLAUDE_SETTINGS with channelsEnabled=true"
+fi
+
 # ---------- restart daemon so it re-reads config ----------
 
 if [[ -f "$DAEMON_PID_FILE" ]]; then
@@ -355,10 +380,36 @@ if [[ -f "$DAEMON_PID_FILE" ]]; then
   fi
 fi
 
+# ---------- shell-alias suggestion for the launch flag ----------
+#
+# The --dangerously-load-development-channels flag can NOT be set as a
+# persistent setting — it's a CLI flag Claude Code reads each launch.
+# Best we can do is suggest a one-line alias for the user's shell rc.
+
+SHELL_NAME="$(basename "${SHELL:-bash}")"
+case "$SHELL_NAME" in
+  zsh)  RC="~/.zshrc"  ;;
+  bash) RC="~/.bashrc" ;;
+  fish) RC="~/.config/fish/config.fish" ;;
+  *)    RC="your shell's rc file" ;;
+esac
+
+ALIAS_LINE='alias claude='"'"'command claude --dangerously-load-development-channels server:matrix-bridge'"'"
+
 echo
 echo "Setup complete."
-echo "Next steps:"
-echo "  1. Relaunch Claude Code with the channels flag:"
-echo "       claude --dangerously-load-development-channels server:matrix-bridge"
-echo "  2. Inside the TUI, run: /mx-link-chat"
+echo
+echo "REQUIRED next: Claude Code must be launched with the channels-API flag,"
+echo "  or matrix → TUI inbound is silently dropped (bridge would still load,"
+echo "  but messages from matrix never reach your live session)."
+echo
+echo "  Option A — add a one-time alias to $RC:"
+echo "    $ALIAS_LINE"
+echo "  then restart your shell (or 'source $RC') and any 'claude' command"
+echo "  picks up the flag automatically."
+echo
+echo "  Option B — type the full command every launch:"
+echo "    claude --dangerously-load-development-channels server:matrix-bridge"
+echo
+echo "Then inside the TUI: /mx-link-chat to pick or create a Matrix room."
 echo
