@@ -31,7 +31,7 @@
 > ≥ 20 so `dist/server.js` runs under the ESM bundle.
 
 > ⚠ **THIS BRIDGE REQUIRES A LAUNCH FLAG.** Claude Code must be started with
-> `--dangerously-load-development-channels server:matrix-bridge` (see step 5). Without
+> `--dangerously-load-development-channels server:matrix-bridge` (see step 3). Without
 > it, MCP tools work but matrix → TUI inbound is silently dropped. The bridge
 > detects the missing flag and surfaces a `⛓️‍💥` glyph in the statusLine + a
 > warning in `/mx-link-chat` output, but you'll still need to relaunch Claude Code.
