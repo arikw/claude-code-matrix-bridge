@@ -1,6 +1,6 @@
 {
   "name": "rx-claude-matrix-bridge",
-  "version": "0.4.15",
+  "version": "0.4.16",
   "description": "Matrix as a Claude Code Channel: live two-way bridge with always-on daemon + per-session routing + headless fallback for offline TUIs.",
   "private": true,
   "type": "module",
