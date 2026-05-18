@@ -8,7 +8,7 @@
 
 | | |
 |---|---|
-| **Status** | v0.4.12 — works against Claude Code 2.1.143; channels API still research preview |
+| **Status** | v0.4.13 — works against Claude Code 2.1.143; channels API still research preview |
 | **Platforms** | Linux + macOS. Windows works via WSL2 only — hooks + `bin/*` are bash scripts that won't run under cmd/PowerShell. |
 | **Requires** | Claude Code ≥ v2.1.80 (Channels API) · Node.js ≥ 20 · Matrix homeserver + bot account |
 | **Shell deps** | `bash`, `jq`, `curl`, `python3`, plus standard POSIX `awk` / `sed` / `tr` / `cat` |
@@ -421,7 +421,7 @@ surface gated entirely on **matrix account integrity**.
 - C0 control chars + `0x7f` stripped from inbound + reply bodies (redactControls).
 - Reply text truncated to 16 KiB.
 
-### Known limitations (v0.4.12)
+### Known limitations (v0.4.13)
 
 - **Plaintext rooms only.** E2EE via olm/megolm sidecar is on the roadmap.
 - **Single owner.** Multi-user support not yet.
