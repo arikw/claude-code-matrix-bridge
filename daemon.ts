@@ -520,7 +520,7 @@ async function runHeadless(link: Link, msg: string, roomId: string): Promise<voi
     '--add-dir', link.cwd,
     '--', msg,
   ]
-  const env = { ...process.env, MX_HEADLESS: '1' }
+  const env: NodeJS.ProcessEnv = { ...process.env, MX_HEADLESS: '1' }
   // permission mode: caller may have set MX_CLAUDE_PERMISSION_MODE
   if (env.MX_CLAUDE_PERMISSION_MODE) {
     args.splice(args.length - 2, 0, '--permission-mode', env.MX_CLAUDE_PERMISSION_MODE)
