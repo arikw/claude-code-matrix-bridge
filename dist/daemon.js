@@ -311,12 +311,6 @@ function send(socket, msg) {
   } catch {
   }
 }
-function broadcastToSession(session_id, msg) {
-  const s = registered.get(session_id);
-  if (!s || s.size === 0) return false;
-  for (const reg of s) send(reg.socket, msg);
-  return true;
-}
 async function deliverInbound(roomId, evt) {
   let body = redactControls(String(evt.content?.body ?? ""));
   await log("debug", `DBG inbound recv room=${roomId} evt=${evt.event_id} sender=${evt.sender} bytes=${body.length} registered=[${[...registered.keys()].map((k) => `${k}:${registered.get(k)?.size ?? 0}`).join(",")}]`);
@@ -346,7 +340,7 @@ ${body}`;
       await log("info", `recap-since tui\u2192matrix sid=${sid} prevMatrix=${prevMatrix ?? "(none)"} lastTui=${lastTui}`);
     }
     await writeLastMatrixMsg(sid, evtIso);
-    const inbound2 = {
+    const inbound = {
       type: "inbound",
       room_id: roomId,
       room_name: name,
@@ -358,7 +352,7 @@ ${body}`;
     const regs = registered.get(sid);
     await log("debug", `DBG inbound broadcast sid=${sid} sockets=${regs?.size ?? 0}`);
     if (regs && regs.size > 0) {
-      const encoded = encode(inbound2);
+      const encoded = encode(inbound);
       let i = 0;
       for (const reg of regs) {
         i++;
@@ -378,23 +372,10 @@ ${body}`;
     void runHeadless(link, body, roomId);
     return;
   }
-  const inbound = {
-    type: "inbound",
-    room_id: roomId,
-    room_name: name,
-    message_id: evt.event_id,
-    sender: evt.sender,
-    body,
-    ts: new Date(Number(evt.origin_server_ts) || Date.now()).toISOString()
-  };
-  if (registered.size === 1) {
-    const [session_id] = registered.keys();
-    startTyping(roomId);
-    broadcastToSession(session_id, inbound);
-    await log("info", `inbound\u2192tui room=${roomId} sid=${session_id} (orphan\u2192sole)`);
-    return;
-  }
-  await log("warn", `inbound dropped room=${roomId} (orphan, ${regCount()} sockets across ${registered.size} sessions)`);
+  await log(
+    "warn",
+    `inbound dropped room=${roomId} sender=${evt.sender} bytes=${body.length} (orphan, ${regCount()} sockets across ${registered.size} sessions). Run /mx-link-chat in a Claude Code session to bind this room.`
+  );
 }
 async function runHeadless(link, msg, roomId) {
   await log("info", `headless room=${roomId} sid=${link.session_id} cwd=${link.cwd}`);
