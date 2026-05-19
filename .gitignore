@@ -11,3 +11,4 @@ docs/superpowers/
 .claude/memory/
 .claude/plans/
 .claude/settings.local.json
+.playwright-mcp/

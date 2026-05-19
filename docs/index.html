@@ -180,6 +180,21 @@
   details > summary::-webkit-details-marker { display: none; }
   details[open] summary svg { transform: rotate(90deg); }
   details summary svg { transition: transform 0.15s ease; }
+
+  /* Horizontal-scroll fade — visual hint that content extends to the right. */
+  .scroll-fade { position: relative; }
+  .scroll-fade::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0; right: 0;
+    width: 32px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, #0d1117);
+    border-bottom-right-radius: 12px;
+  }
+  .scroll-fade.fade-dark::after {
+    background: linear-gradient(90deg, transparent, #101521);
+  }
 </style>
 </head>
 <body class="bg-ink-950 text-gray-100">
@@ -210,19 +225,20 @@
   <div class="absolute inset-0 grid-bg opacity-30"></div>
   <div class="relative max-w-7xl mx-auto px-6 pt-16 pb-24 md:pt-24 md:pb-32 grid md:grid-cols-2 gap-12 items-center">
 
-    <!-- left: pitch -->
-    <div>
+    <!-- left: pitch — min-w-0 stops the overflowing install snippet from
+         expanding the grid cell past the viewport on narrow screens -->
+    <div class="min-w-0">
       <div class="inline-flex items-center gap-2 bg-mauve-500/10 border border-mauve-500/30 text-mauve-400 text-xs px-3 py-1 rounded-full mb-6">
         <span class="w-1.5 h-1.5 rounded-full bg-mauve-400 animate-pulse"></span>
         Claude Code plugin · v0.4.22
       </div>
 
-      <h1 class="text-4xl md:text-6xl font-bold tracking-tight leading-tight">
+      <h1 class="text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight leading-[1.1]">
         Your coding agent,
         <span class="bg-gradient-to-r from-accent-400 to-mauve-400 bg-clip-text text-transparent">anywhere you are.</span>
       </h1>
 
-      <p class="mt-6 text-lg md:text-xl text-gray-300 leading-relaxed">
+      <p class="mt-5 md:mt-6 text-base sm:text-lg md:text-xl text-gray-300 leading-relaxed">
         Chat with your live Claude Code session over Matrix. From your phone on
         the bus, a laptop at the café, a second machine at home, any device.
         Real-time, in the same conversation. Not a chatbot. Not a poll loop.
@@ -230,7 +246,7 @@
       </p>
 
       <!-- Install CTA -->
-      <div class="mt-8 relative max-w-xl">
+      <div class="mt-6 md:mt-8 relative max-w-xl w-full">
         <div class="terminal">
           <div class="terminal-bar">
             <div class="term-dot bg-red-500/80"></div>
@@ -238,9 +254,11 @@
             <div class="term-dot bg-green-500/80"></div>
             <span class="mono text-xs text-gray-500 ml-2">install</span>
           </div>
-          <pre id="install-snippet" class="mono text-sm p-4 text-gray-100 overflow-x-auto"><span class="text-accent-400">$</span> claude plugin marketplace add arikw/claude-code-matrix-bridge
+          <div class="scroll-fade">
+            <pre id="install-snippet" class="mono text-xs sm:text-sm p-4 text-gray-100 overflow-x-auto"><span class="text-accent-400">$</span> claude plugin marketplace add arikw/claude-code-matrix-bridge
 <span class="text-accent-400">$</span> claude plugin install rx-claude-matrix-bridge@arikw
 <span class="text-accent-400">$</span> claude --dangerously-load-development-channels server:matrix-bridge</pre>
+          </div>
         </div>
         <button class="copy-btn mono" onclick="copyInstall(this)">copy</button>
       </div>
@@ -272,11 +290,11 @@
       </div>
     </div>
 
-    <!-- right: dual device mockup -->
-    <div class="relative flex justify-center items-center min-h-[480px]">
+    <!-- right: dual device mockup (terminal always, phone only ≥md) -->
+    <div class="relative flex justify-center items-center md:min-h-[480px] min-w-0">
 
       <!-- Terminal -->
-      <div class="terminal w-full max-w-md float-slow">
+      <div class="terminal w-full max-w-md md:float-slow">
         <div class="terminal-bar">
           <div class="term-dot bg-red-500/80"></div>
           <div class="term-dot bg-yellow-500/80"></div>
@@ -289,18 +307,18 @@
           <div class="text-gray-200">Refactoring `src/middleware/auth.ts`...</div>
           <div class="mt-1 text-gray-400">  • Created file</div>
           <div class="text-gray-400">  • Updated 3 imports</div>
-          <div class="text-gray-400">  • Tests still pass ✓</div>
+          <div class="text-gray-400">  • Tests still pass</div>
           <div class="mt-3 text-mauve-400">[channel src=matrix-bridge user=@you ts=14:32]</div>
           <div class="text-gray-300">&nbsp;&nbsp;also add a jsdoc comment to the new file</div>
           <div class="mt-3 text-green-300">●</div>
           <div class="text-gray-200">Adding doc comment...</div>
-          <div class="mt-1 text-gray-400">  ✓ src/middleware/auth.ts</div>
+          <div class="mt-1 text-gray-400">  src/middleware/auth.ts</div>
           <div class="mt-3 text-accent-400 mono">$ <span class="blink">▌</span></div>
         </div>
       </div>
 
-      <!-- Phone -->
-      <div class="phone absolute -right-2 -bottom-6 md:right-0 md:-bottom-12 float-med scale-90 md:scale-100">
+      <!-- Phone (hidden on mobile — terminal alone tells the story at narrow widths) -->
+      <div class="phone hidden md:block absolute md:right-0 md:-bottom-12 float-med">
         <div class="phone-screen">
           <div class="phone-notch"></div>
           <!-- Element-ish header -->
@@ -315,7 +333,7 @@
           </div>
           <!-- Chat body -->
           <div class="absolute inset-x-0 top-[68px] bottom-[44px] px-3 py-3 flex flex-col gap-2 overflow-hidden">
-            <div class="bubble-in">Refactoring `auth.ts`… done. Tests pass ✓</div>
+            <div class="bubble-in">Refactoring auth.ts… done. Tests pass.</div>
             <div class="bubble-out">also add a jsdoc comment to the new file</div>
             <div class="bubble-in">
               <div class="flex items-center gap-1.5">
@@ -324,7 +342,7 @@
                 <span class="w-1.5 h-1.5 rounded-full bg-white/60 animate-pulse" style="animation-delay:0.4s"></span>
               </div>
             </div>
-            <div class="bubble-in">Added doc comment to `src/middleware/auth.ts`. Anything else?</div>
+            <div class="bubble-in">Added doc comment to src/middleware/auth.ts. Anything else?</div>
           </div>
           <!-- Input -->
           <div class="absolute inset-x-0 bottom-0 px-3 py-3 bg-[#1c1c1e] border-t border-white/5">
@@ -347,17 +365,29 @@
 
     <div class="grid md:grid-cols-3 gap-6">
       <div class="feature-card rounded-xl p-6">
-        <div class="text-2xl mb-3">📡</div>
+        <div class="w-10 h-10 rounded-lg bg-accent-500/15 text-accent-400 flex items-center justify-center mb-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12a7 7 0 0 1 14 0M2 12a10 10 0 0 1 20 0M8.5 12a3.5 3.5 0 1 1 7 0"/>
+          </svg>
+        </div>
         <h3 class="font-semibold text-lg mb-2">1. Daemon listens to Matrix</h3>
         <p class="text-gray-400 text-sm leading-relaxed">A small Node.js daemon stays connected to your Matrix homeserver (Synapse, Tuwunel, Conduwuit, anything). It auto-joins rooms you invite the bot to, sees every message you send.</p>
       </div>
       <div class="feature-card rounded-xl p-6">
-        <div class="text-2xl mb-3">🔀</div>
+        <div class="w-10 h-10 rounded-lg bg-mauve-500/15 text-mauve-400 flex items-center justify-center mb-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h6l2 3 2-3h8M3 17h6l2-3 2 3h8"/>
+          </svg>
+        </div>
         <h3 class="font-semibold text-lg mb-2">2. Plugin routes per session</h3>
         <p class="text-gray-400 text-sm leading-relaxed">An MCP server runs per Claude Code TUI. It registers your session with the daemon and binds it to a Matrix room via the <span class="mono text-accent-400">/mx-link-chat</span> slash command. Each room talks only to its bound session.</p>
       </div>
       <div class="feature-card rounded-xl p-6">
-        <div class="text-2xl mb-3">⚡</div>
+        <div class="w-10 h-10 rounded-lg bg-yellow-500/15 text-yellow-400 flex items-center justify-center mb-3">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 3 4 14h7l-1 7 9-11h-7l1-7z"/>
+          </svg>
+        </div>
         <h3 class="font-semibold text-lg mb-2">3. Live push, not poll</h3>
         <p class="text-gray-400 text-sm leading-relaxed">Matrix messages arrive in your TUI as Claude Code Channels-API notifications — part of the same conversation Claude is already having with you. Replies go back to Matrix via the <span class="mono text-accent-400">reply</span> tool.</p>
       </div>
@@ -372,7 +402,8 @@
           <div class="term-dot bg-green-500/80"></div>
           <span class="mono text-xs text-gray-500 ml-2">data flow</span>
         </div>
-        <pre class="mono text-xs p-5 text-gray-300 leading-relaxed overflow-x-auto">     <span class="text-mauve-400">Your phone / laptop / any matrix client</span>
+        <div class="scroll-fade">
+          <pre class="mono text-[10px] sm:text-xs p-5 text-gray-300 leading-relaxed overflow-x-auto">     <span class="text-mauve-400">Your phone / laptop / any matrix client</span>
               │  m.room.message
               ▼
      <span class="text-accent-400">Matrix homeserver</span>  ←──── outbound replies ────┐
@@ -387,6 +418,7 @@
               │   ↓  notifications/claude/channel     │
               ▼                                       │
      <span class="text-mauve-400">Your live Claude Code TUI session</span> ───── reply tool ─┘</pre>
+        </div>
       </div>
     </div>
   </div>
@@ -403,19 +435,33 @@
     <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
 
       <div class="text-center">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-accent-500/10 border border-accent-500/30 text-accent-400 mb-4 text-2xl">📱</div>
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-accent-500/10 border border-accent-500/30 text-accent-400 mb-4">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="6" y="2" width="12" height="20" rx="2.5"/>
+            <line x1="10" y1="18" x2="14" y2="18"/>
+          </svg>
+        </div>
         <h3 class="text-xl font-semibold mb-2">Continue from anywhere</h3>
         <p class="text-gray-400 leading-relaxed">Phone, second machine, dev container, a hotel laptop, a CI server. Any device that runs a Matrix client can drive your live coding agent. No browser tab, no remote desktop, no copy-paste.</p>
       </div>
 
       <div class="text-center">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-mauve-500/10 border border-mauve-500/30 text-mauve-400 mb-4 text-2xl">⚡</div>
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-mauve-500/10 border border-mauve-500/30 text-mauve-400 mb-4">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 3 4 14h7l-1 7 9-11h-7l1-7z"/>
+          </svg>
+        </div>
         <h3 class="text-xl font-semibold mb-2">Real-time, same context</h3>
         <p class="text-gray-400 leading-relaxed">Messages arrive in the running Claude session as Channels-API notifications. The agent already knows your repo, the open file, what tests just failed. No fresh-process amnesia.</p>
       </div>
 
       <div class="text-center">
-        <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 mb-4 text-2xl">🔄</div>
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 mb-4">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20 9a8 8 0 0 0-14.93-2.5M4 15a8 8 0 0 0 14.93 2.5"/>
+          </svg>
+        </div>
         <h3 class="text-xl font-semibold mb-2">Survives anything</h3>
         <p class="text-gray-400 leading-relaxed">Closed your terminal? Headless <span class="mono text-accent-400">claude --print --resume</span> takes over so your message still gets answered. Re-opened with <span class="mono text-accent-400">--resume</span>? Routing reattaches. Plugin updated? Stale-version auto-detected.</p>
       </div>
@@ -447,7 +493,7 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
         </div>
         <h3 class="font-semibold text-lg mb-2">Multi-session routing</h3>
-        <p class="text-gray-400 text-sm leading-relaxed">N rooms ↔ N TUI sessions. Each Matrix room talks only to its bound Claude Code session. Different projects stay isolated.</p>
+        <p class="text-gray-400 text-sm leading-relaxed">N rooms &harr; N TUI sessions. Each Matrix room talks only to its bound Claude Code session. Different projects stay isolated.</p>
       </div>
 
       <div class="feature-card rounded-xl p-6">
@@ -490,24 +536,32 @@
 <section class="py-16 md:py-20 hero-bg border-y border-white/5">
   <div class="max-w-5xl mx-auto px-6 text-center">
     <p class="text-sm uppercase tracking-widest text-gray-500 mb-8">Works with any matrix client + any matrix homeserver</p>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-      <div class="px-4 py-3 rounded-lg border border-white/5 bg-white/[0.02]">
-        <div class="text-2xl mb-1">🟢</div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 text-center">
+      <div class="px-4 py-4 rounded-lg border border-white/5 bg-white/[0.02]">
+        <div class="w-7 h-7 rounded-full bg-green-500/20 border border-green-500/40 mx-auto mb-2 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-green-400" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg>
+        </div>
         <div class="font-medium">Element</div>
         <div class="text-xs text-gray-500">iOS, Android, web</div>
       </div>
-      <div class="px-4 py-3 rounded-lg border border-white/5 bg-white/[0.02]">
-        <div class="text-2xl mb-1">🐾</div>
+      <div class="px-4 py-4 rounded-lg border border-white/5 bg-white/[0.02]">
+        <div class="w-7 h-7 rounded-full bg-pink-500/20 border border-pink-500/40 mx-auto mb-2 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-pink-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/></svg>
+        </div>
         <div class="font-medium">FluffyChat</div>
         <div class="text-xs text-gray-500">cross-platform</div>
       </div>
-      <div class="px-4 py-3 rounded-lg border border-white/5 bg-white/[0.02]">
-        <div class="text-2xl mb-1">🟣</div>
+      <div class="px-4 py-4 rounded-lg border border-white/5 bg-white/[0.02]">
+        <div class="w-7 h-7 rounded-full bg-mauve-500/20 border border-mauve-500/40 mx-auto mb-2 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-mauve-400" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/></svg>
+        </div>
         <div class="font-medium">SchildiChat</div>
         <div class="text-xs text-gray-500">Android, desktop</div>
       </div>
-      <div class="px-4 py-3 rounded-lg border border-white/5 bg-white/[0.02]">
-        <div class="text-2xl mb-1">💬</div>
+      <div class="px-4 py-4 rounded-lg border border-white/5 bg-white/[0.02]">
+        <div class="w-7 h-7 rounded-full bg-accent-500/20 border border-accent-500/40 mx-auto mb-2 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-accent-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12c0 4.4-4 8-9 8a10 10 0 0 1-4-.8L3 21l1.8-4A8 8 0 0 1 3 12c0-4.4 4-8 9-8s9 3.6 9 8z"/></svg>
+        </div>
         <div class="font-medium">Cinny · Nheko · CLI</div>
         <div class="text-xs text-gray-500">+ any spec-compliant client</div>
       </div>
@@ -529,7 +583,8 @@
       </p>
     </div>
 
-    <div class="overflow-x-auto rounded-xl border border-white/10">
+    <!-- Desktop: full table -->
+    <div class="hidden md:block rounded-xl border border-white/10 overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-white/5">
           <tr class="text-left">
@@ -550,36 +605,147 @@
           </tr>
           <tr>
             <td class="px-4 py-3 text-gray-300">Wakes live TUI session</td>
-            <td class="px-4 py-3 winner-col text-green-400">✓ yes</td>
-            <td class="px-4 py-3 text-red-400/80">✗ agent must poll</td>
-            <td class="px-4 py-3 text-yellow-400/80">~ tmux only</td>
+            <td class="px-4 py-3 winner-col text-green-400">yes</td>
+            <td class="px-4 py-3 text-red-400/80">no — agent must poll</td>
+            <td class="px-4 py-3 text-yellow-400/80">tmux only</td>
           </tr>
           <tr>
             <td class="px-4 py-3 text-gray-300">Multi-session routing</td>
-            <td class="px-4 py-3 winner-col text-green-400">✓ built-in</td>
-            <td class="px-4 py-3 text-red-400/80">✗</td>
+            <td class="px-4 py-3 winner-col text-green-400">built-in</td>
+            <td class="px-4 py-3 text-red-400/80">no</td>
             <td class="px-4 py-3 text-yellow-400/80">manual tmux setup</td>
           </tr>
           <tr>
             <td class="px-4 py-3 text-gray-300">Headless fallback when TUI offline</td>
-            <td class="px-4 py-3 winner-col text-green-400">✓ auto</td>
-            <td class="px-4 py-3 text-red-400/80">✗</td>
-            <td class="px-4 py-3 text-red-400/80">✗</td>
+            <td class="px-4 py-3 winner-col text-green-400">auto</td>
+            <td class="px-4 py-3 text-red-400/80">no</td>
+            <td class="px-4 py-3 text-red-400/80">no</td>
           </tr>
           <tr>
             <td class="px-4 py-3 text-gray-300">Interactive setup wizard</td>
-            <td class="px-4 py-3 winner-col text-green-400">✓</td>
-            <td class="px-4 py-3 text-red-400/80">✗ manual</td>
-            <td class="px-4 py-3 text-red-400/80">✗ manual</td>
+            <td class="px-4 py-3 winner-col text-green-400">yes</td>
+            <td class="px-4 py-3 text-red-400/80">manual</td>
+            <td class="px-4 py-3 text-red-400/80">manual</td>
           </tr>
           <tr>
             <td class="px-4 py-3 text-gray-300">Works with Matrix (not Telegram-only)</td>
-            <td class="px-4 py-3 winner-col text-green-400">✓</td>
-            <td class="px-4 py-3 text-green-400">✓</td>
+            <td class="px-4 py-3 winner-col text-green-400">yes</td>
+            <td class="px-4 py-3 text-green-400">yes</td>
             <td class="px-4 py-3 text-red-400/80">Telegram</td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <!-- Mobile: stacked card per capability -->
+    <div class="md:hidden space-y-4">
+      <div class="rounded-xl border border-white/10 bg-ink-800/40 overflow-hidden">
+        <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">Transport</div>
+        <div class="divide-y divide-white/5 text-sm">
+          <div class="px-4 py-2.5 flex justify-between gap-3 winner-col">
+            <span class="text-accent-400 font-medium">rx-claude-matrix-bridge</span>
+            <span class="text-right text-gray-200">Channels API push</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">elkimek/matrix-bridge</span>
+            <span class="text-right text-gray-400">MCP tool calls (pull)</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
+            <span class="text-right text-gray-400">tmux keys / headless print</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-white/10 bg-ink-800/40 overflow-hidden">
+        <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">Wakes live TUI session</div>
+        <div class="divide-y divide-white/5 text-sm">
+          <div class="px-4 py-2.5 flex justify-between gap-3 winner-col">
+            <span class="text-accent-400 font-medium">rx-claude-matrix-bridge</span>
+            <span class="text-right text-green-400">yes</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">elkimek/matrix-bridge</span>
+            <span class="text-right text-red-400/80">no — agent must poll</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
+            <span class="text-right text-yellow-400/80">tmux only</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-white/10 bg-ink-800/40 overflow-hidden">
+        <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">Multi-session routing</div>
+        <div class="divide-y divide-white/5 text-sm">
+          <div class="px-4 py-2.5 flex justify-between gap-3 winner-col">
+            <span class="text-accent-400 font-medium">rx-claude-matrix-bridge</span>
+            <span class="text-right text-green-400">built-in</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">elkimek/matrix-bridge</span>
+            <span class="text-right text-red-400/80">no</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
+            <span class="text-right text-yellow-400/80">manual tmux setup</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-white/10 bg-ink-800/40 overflow-hidden">
+        <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">Headless fallback when TUI offline</div>
+        <div class="divide-y divide-white/5 text-sm">
+          <div class="px-4 py-2.5 flex justify-between gap-3 winner-col">
+            <span class="text-accent-400 font-medium">rx-claude-matrix-bridge</span>
+            <span class="text-right text-green-400">auto</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">elkimek/matrix-bridge</span>
+            <span class="text-right text-red-400/80">no</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
+            <span class="text-right text-red-400/80">no</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-white/10 bg-ink-800/40 overflow-hidden">
+        <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">Interactive setup wizard</div>
+        <div class="divide-y divide-white/5 text-sm">
+          <div class="px-4 py-2.5 flex justify-between gap-3 winner-col">
+            <span class="text-accent-400 font-medium">rx-claude-matrix-bridge</span>
+            <span class="text-right text-green-400">yes</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">elkimek/matrix-bridge</span>
+            <span class="text-right text-red-400/80">manual</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
+            <span class="text-right text-red-400/80">manual</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-white/10 bg-ink-800/40 overflow-hidden">
+        <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">Works with Matrix (not Telegram-only)</div>
+        <div class="divide-y divide-white/5 text-sm">
+          <div class="px-4 py-2.5 flex justify-between gap-3 winner-col">
+            <span class="text-accent-400 font-medium">rx-claude-matrix-bridge</span>
+            <span class="text-right text-green-400">yes</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">elkimek/matrix-bridge</span>
+            <span class="text-right text-green-400">yes</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
+            <span class="text-right text-red-400/80">Telegram</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <p class="text-center text-sm text-gray-500 mt-6">
