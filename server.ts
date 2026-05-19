@@ -571,6 +571,13 @@ async function main(): Promise<void> {
     await log('warn', `skipping daemon connect — needs setup: ${needsSetupReason}`)
   }
 
+  // Last-known channels-capable value, hoisted so the session-change watcher
+  // below can re-publish the channels-capable/<sid> state file under the new
+  // sid. The MCP `oninitialized` handler computes it once at connect time
+  // from /proc/<ccPid>/cmdline; it doesn't re-fire on session change, so
+  // without this re-publish the statusLine reads stale state for the new sid.
+  let channelsCapable = false
+
   // Watch for session_id changes (CC /clear, /resume mid-TUI, etc.) — the
   // SessionStart hook re-writes the sessions/<CC-PID>.json file each time.
   // Poll it every 5s; on change, unregister old + register new with daemon.
@@ -586,6 +593,9 @@ async function main(): Promise<void> {
         client.send({ type: 'unregister', session_id: old })
         client.send({ type: 'register', session_id, cwd })
         await log('info', `session change old=${old} → new=${session_id}; re-registered`)
+        // Carry channels-capable forward to the new sid — cmdline of the
+        // owning CC process didn't change, so the value is still valid.
+        void fs.writeFile(join(STATE_DIR, 'channels-capable', session_id), channelsCapable ? 'true' : 'false').catch(() => {})
       }
     }, 5_000).unref()
   }
@@ -641,7 +651,7 @@ async function main(): Promise<void> {
       cmdline = readFileSync(`/proc/${ccPid}/cmdline`, 'utf8').replace(/\0/g, ' ').trim()
     } catch {}
     const flagRe = /--(?:dangerously-load-development-channels|channels)\s+plugin:rx-claude-matrix-bridge(?:@[\w-]+)?(?:\s|$)/
-    const channelsCapable = flagRe.test(cmdline)
+    channelsCapable = flagRe.test(cmdline)
     void log(
       channelsCapable ? 'info' : 'warn',
       `client init sid=${session_id} name=${ver?.name ?? '?'} ver=${ver?.version ?? '?'} channels-capable=${channelsCapable} experimental=${JSON.stringify(caps?.experimental ?? {})} ccPid=${ccPid}`,

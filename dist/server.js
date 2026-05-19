@@ -15906,6 +15906,7 @@ async function main() {
   } else {
     await log("warn", `skipping daemon connect \u2014 needs setup: ${needsSetupReason}`);
   }
+  let channelsCapable = false;
   if (!needsSetup) {
     setInterval(async () => {
       const fresh = await readSessionFromHook(500);
@@ -15917,6 +15918,8 @@ async function main() {
         client.send({ type: "unregister", session_id: old });
         client.send({ type: "register", session_id, cwd });
         await log("info", `session change old=${old} \u2192 new=${session_id}; re-registered`);
+        void fs.writeFile(join(STATE_DIR, "channels-capable", session_id), channelsCapable ? "true" : "false").catch(() => {
+        });
       }
     }, 5e3).unref();
   }
@@ -15956,7 +15959,7 @@ All bridge tools will refuse until the user fully exits and relaunches Claude Co
     } catch {
     }
     const flagRe = /--(?:dangerously-load-development-channels|channels)\s+plugin:rx-claude-matrix-bridge(?:@[\w-]+)?(?:\s|$)/;
-    const channelsCapable = flagRe.test(cmdline);
+    channelsCapable = flagRe.test(cmdline);
     void log(
       channelsCapable ? "info" : "warn",
       `client init sid=${session_id} name=${ver?.name ?? "?"} ver=${ver?.version ?? "?"} channels-capable=${channelsCapable} experimental=${JSON.stringify(caps?.experimental ?? {})} ccPid=${ccPid}`
