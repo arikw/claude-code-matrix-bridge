@@ -31,10 +31,11 @@
 > ≥ 20 so `dist/server.js` runs under the ESM bundle.
 
 > ⚠ **THIS BRIDGE REQUIRES A LAUNCH FLAG.** Claude Code must be started with
-> `--dangerously-load-development-channels server:matrix-bridge` (see step 2). Without
-> it, MCP tools work but matrix → TUI inbound is silently dropped. The bridge
-> detects the missing flag and surfaces a `⛓️‍💥` glyph in the statusLine + a
-> warning in `/mx-link-chat` output, but you'll still need to relaunch Claude Code.
+> `--dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw`
+> (see step 2). Without it, MCP tools work but matrix → TUI inbound is silently
+> dropped. The bridge detects the missing flag and surfaces a `⛓️‍💥` glyph in
+> the statusLine + a warning in `/mx-link-chat` output, but you'll still need to
+> relaunch Claude Code.
 
 ---
 
@@ -56,10 +57,15 @@ via reactions (Kholtien), attachment / reaction / edit tools (nazbav).
 
 > All four use Claude Code as the chat-driven AI; the Channels-API-based ones
 > (this project, nazbav, Kholtien) need the `--dangerously-load-development-channels`
-> launch flag and `"channelsEnabled": true` in `~/.claude/settings.json`. Without
-> both, inbound matrix events get silently dropped. This plugin's wizard sets the
-> setting automatically and prints the shell-rc alias for the flag; the others
-> leave both as manual steps.
+> launch flag. The flag value must be `plugin:<plugin-name>@<marketplace>` (not
+> `server:<mcp-server-name>`) — CC's matcher splits the server-id on `:` and
+> rejects the `server:` form for plugin-loaded MCP servers. Without the correct
+> flag, inbound matrix events get silently dropped. The persistent setting
+> `"channelsEnabled": true` is additionally required on Team/Enterprise tiers
+> and on any account with a managed-settings policy file present; on a plain
+> personal account with no managed settings it's a no-op. This plugin's wizard
+> sets it defensively anyway and prints the shell-rc alias for the flag; the
+> others leave both as manual steps.
 >
 > Full comparison + capability matrix on the [project page](https://arikw.github.io/claude-code-matrix-bridge/#compare).
 
@@ -96,7 +102,7 @@ checkout), otherwise spawns `tsx server.ts` directly (unbuilt dev checkout).
 
 ```bash
 cd /path/to/your/project
-claude --dangerously-load-development-channels server:matrix-bridge
+claude --dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw
 ```
 
 The first launch auto-spawns the daemon. Subsequent TUIs connect to the running
@@ -104,7 +110,7 @@ daemon over `~/.claude/channels/rx-claude-matrix-bridge/daemon.sock`.
 
 > **Make this permanent** — wrap Claude Code in a shell alias so you don't forget the flag:
 > ```bash
-> alias claude='command claude --dangerously-load-development-channels server:matrix-bridge'
+> alias claude='command claude --dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw'
 > ```
 > (the setup wizard in step 3 will print this exact line tailored to your shell's rc file)
 
@@ -172,7 +178,7 @@ immediately:
 |---|---|
 | `🔗 mx:<room>` | Linked + healthy |
 | `✏️` | Owner is typing in the linked room |
-| `⛓️‍💥 mx:<room>` | Claude Code was launched without `--dangerously-load-development-channels server:matrix-bridge` (matrix → TUI inbound silently dropped) |
+| `⛓️‍💥 mx:<room>` | Claude Code was launched without `--dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw` (matrix → TUI inbound silently dropped) |
 | `⚙ mx:needs-setup` | `config.env` missing or has placeholder values (run `bin/mx-setup`) |
 | `🔄 mx:restart-claude-code` | Plugin was updated mid-session and the live MCP server is stale (fully restart Claude Code) |
 
@@ -328,7 +334,7 @@ plugin-root                            # absolute path to repo (self-locate)
 | StatusLine shows `🔄 mx:restart-claude-code` | A newer plugin version is installed on disk than the one Claude Code currently has loaded — happens after `claude plugin update` without a full restart. Fully exit Claude Code (not just `/mcp` reconnect) and relaunch with the channels flag. |
 | StatusLine shows `⚙ mx:needs-setup` | `config.env` missing or has placeholder values. Run `bash /path/to/repo/bin/mx-setup` and relaunch Claude Code. |
 | `/mx-link-chat` returns "bridge is not configured" | Same as above. The error message includes the absolute path to `bin/mx-setup`. |
-| StatusLine shows `⛓️‍💥` | Claude Code launched without `--dangerously-load-development-channels server:matrix-bridge`. Relaunch with it. |
+| StatusLine shows `⛓️‍💥` | Claude Code launched without the matrix-bridge channels flag. Relaunch with `--dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw`. |
 | `/mx-link-chat` output includes "WARNING: launched WITHOUT --dangerously..." | Same as above. |
 | MCP not connecting (`/mcp` shows nothing) | Confirm `.mcp.json` is present in cwd, flag passed, `claude /mcp` reload. |
 | Channel events not arriving but flag is set | Confirm `"channelsEnabled": true` in `~/.claude/settings.json`. Tail `daemon.log` for `inbound→tui` entries; `server.log` for `DBG mcp.notification SENT`. |

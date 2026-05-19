@@ -257,7 +257,7 @@
           <div class="scroll-fade">
             <pre id="install-snippet" class="mono text-xs sm:text-sm p-4 text-gray-100 overflow-x-auto"><span class="text-accent-400">$</span> claude plugin marketplace add arikw/claude-code-matrix-bridge
 <span class="text-accent-400">$</span> claude plugin install rx-claude-matrix-bridge@arikw
-<span class="text-accent-400">$</span> claude --dangerously-load-development-channels server:matrix-bridge</pre>
+<span class="text-accent-400">$</span> claude --dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw</pre>
           </div>
         </div>
         <button class="copy-btn mono" onclick="copyInstall(this)">copy</button>
@@ -923,11 +923,15 @@
         Every plugin in the table above that uses Claude Code's Channels API push
         transport (rx-claude-matrix-bridge, nazbav/…matrix-channel,
         Kholtien/…matrix-integration) needs the launch flag
-        <span class="mono text-gray-300">--dangerously-load-development-channels server:&lt;name&gt;</span>
-        and the persistent setting
+        <span class="mono text-gray-300">--dangerously-load-development-channels plugin:&lt;plugin-name&gt;@&lt;marketplace&gt;</span>.
+        CC's matcher splits the MCP server-id on <span class="mono">:</span> and
+        rejects the legacy <span class="mono text-gray-300">server:&lt;name&gt;</span>
+        form for plugin-loaded servers (notifications silently dropped).
+        The persistent setting
         <span class="mono text-gray-300">"channelsEnabled": true</span>
-        in <span class="mono text-gray-300">~/.claude/settings.json</span>.
-        Without either, inbound matrix events are silently dropped by Claude Code.
+        in <span class="mono text-gray-300">~/.claude/settings.json</span>
+        is additionally required on Team/Enterprise tiers and on accounts with
+        a managed-settings policy file; on plain personal accounts it's a no-op.
         elkimek/matrix-bridge avoids both because it doesn't use the Channels
         API at all — it exposes MCP tools the agent calls explicitly.
       </p>

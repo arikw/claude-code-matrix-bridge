@@ -15604,7 +15604,7 @@ var LATEST_INSTALLED_VERSION = getLatestInstalledVersion();
 var SERVER_IS_STALE = compareSemver(OWN_VERSION, LATEST_INSTALLED_VERSION) < 0;
 var STALE_MCP_FLAG = join(STATE_DIR, "stale-mcp");
 function staleMessage() {
-  return `MATRIX-BRIDGE: this Claude Code session is running plugin version ${OWN_VERSION}, but a newer version (${LATEST_INSTALLED_VERSION}) is installed on disk. Fully EXIT Claude Code (not just /mcp reconnect) and relaunch with \`claude --dangerously-load-development-channels server:matrix-bridge\` to pick it up.`;
+  return `MATRIX-BRIDGE: this Claude Code session is running plugin version ${OWN_VERSION}, but a newer version (${LATEST_INSTALLED_VERSION}) is installed on disk. Fully EXIT Claude Code (not just /mcp reconnect) and relaunch with \`claude --dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw\` to pick it up.`;
 }
 async function daemonAlive() {
   try {
@@ -15765,9 +15765,9 @@ async function channelsCapableWarning(sid) {
   try {
     const flag = (await fs.readFile(join(STATE_DIR, "channels-capable", sid), "utf8")).trim();
     if (flag === "false") {
-      return `\u26A0 WARNING: this Claude Code instance was launched WITHOUT --dangerously-load-development-channels server:matrix-bridge.
+      return `\u26A0 WARNING: this Claude Code instance was launched WITHOUT the matrix-bridge channels flag.
 Matrix messages sent to this room will NOT reach this TUI (silent drop).
-Relaunch Claude Code with: claude --dangerously-load-development-channels server:matrix-bridge [other flags]`;
+Relaunch Claude Code with: claude --dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw [other flags]`;
     }
   } catch {
   }
@@ -15955,7 +15955,7 @@ All bridge tools will refuse until the user fully exits and relaunches Claude Co
       cmdline = readFileSync(`/proc/${ccPid}/cmdline`, "utf8").replace(/\0/g, " ").trim();
     } catch {
     }
-    const flagRe = /--dangerously-load-development-channels\s+server:matrix-bridge\b/;
+    const flagRe = /--(?:dangerously-load-development-channels|channels)\s+plugin:rx-claude-matrix-bridge(?:@[\w-]+)?(?:\s|$)/;
     const channelsCapable = flagRe.test(cmdline);
     void log(
       channelsCapable ? "info" : "warn",
@@ -15966,7 +15966,7 @@ All bridge tools will refuse until the user fully exits and relaunches Claude Co
     if (!channelsCapable) {
       void log(
         "warn",
-        `MATRIX-BRIDGE: Claude Code was launched WITHOUT --dangerously-load-development-channels server:matrix-bridge. Matrix\u2192TUI inbound will NOT reach this session. Relaunch with that flag.`
+        `MATRIX-BRIDGE: Claude Code was launched WITHOUT the channels flag. Matrix\u2192TUI inbound will NOT reach this session. Relaunch with: claude --dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw`
       );
     }
   };

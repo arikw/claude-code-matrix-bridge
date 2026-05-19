@@ -201,7 +201,7 @@ function staleMessage(): string {
     `MATRIX-BRIDGE: this Claude Code session is running plugin version ${OWN_VERSION}, ` +
     `but a newer version (${LATEST_INSTALLED_VERSION}) is installed on disk. ` +
     `Fully EXIT Claude Code (not just /mcp reconnect) and relaunch with ` +
-    `\`claude --dangerously-load-development-channels server:matrix-bridge\` to pick it up.`
+    `\`claude --dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw\` to pick it up.`
   )
 }
 
@@ -394,9 +394,9 @@ async function channelsCapableWarning(sid: string): Promise<string> {
     const flag = (await fs.readFile(join(STATE_DIR, 'channels-capable', sid), 'utf8')).trim()
     if (flag === 'false') {
       return (
-        `⚠ WARNING: this Claude Code instance was launched WITHOUT --dangerously-load-development-channels server:matrix-bridge.\n` +
+        `⚠ WARNING: this Claude Code instance was launched WITHOUT the matrix-bridge channels flag.\n` +
         `Matrix messages sent to this room will NOT reach this TUI (silent drop).\n` +
-        `Relaunch Claude Code with: claude --dangerously-load-development-channels server:matrix-bridge [other flags]`
+        `Relaunch Claude Code with: claude --dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw [other flags]`
       )
     }
   } catch {}
@@ -626,11 +626,13 @@ async function main(): Promise<void> {
     },
   )
 
-  // Detect whether CC was launched with the channels flag for THIS MCP server.
-  // The flag is `--dangerously-load-development-channels server:matrix-bridge`.
-  // Without it, MCP tools work but `notifications/claude/channel` is dropped.
-  // The flag's state is internal to CC and does NOT appear in MCP capability
-  // handshake — so we read the parent CC's /proc/<pid>/cmdline instead.
+  // Detect whether CC was launched with the channels flag for THIS plugin.
+  // CC's matcher (decompiled): for plugin-loaded MCP servers, the --channels
+  // arg must be `plugin:<plugin-name>[@<marketplace>]`. The marketplace suffix
+  // is required when the plugin was installed from a marketplace (CC rejects
+  // with "marketplace mismatch" otherwise).
+  // Flag's state is internal to CC and does NOT appear in MCP capability
+  // handshake — read parent CC's /proc/<pid>/cmdline instead.
   mcp.oninitialized = () => {
     const caps = mcp.getClientCapabilities()
     const ver = mcp.getClientVersion()
@@ -638,9 +640,7 @@ async function main(): Promise<void> {
     try {
       cmdline = readFileSync(`/proc/${ccPid}/cmdline`, 'utf8').replace(/\0/g, ' ').trim()
     } catch {}
-    // Match the exact pair of args: `--dangerously-load-development-channels server:matrix-bridge`.
-    // Tolerate any arg ordering / whitespace between them.
-    const flagRe = /--dangerously-load-development-channels\s+server:matrix-bridge\b/
+    const flagRe = /--(?:dangerously-load-development-channels|channels)\s+plugin:rx-claude-matrix-bridge(?:@[\w-]+)?(?:\s|$)/
     const channelsCapable = flagRe.test(cmdline)
     void log(
       channelsCapable ? 'info' : 'warn',
@@ -651,8 +651,9 @@ async function main(): Promise<void> {
       .catch(() => {})
     if (!channelsCapable) {
       void log('warn',
-        `MATRIX-BRIDGE: Claude Code was launched WITHOUT --dangerously-load-development-channels server:matrix-bridge. ` +
-        `Matrix→TUI inbound will NOT reach this session. Relaunch with that flag.`)
+        `MATRIX-BRIDGE: Claude Code was launched WITHOUT the channels flag. ` +
+        `Matrix→TUI inbound will NOT reach this session. Relaunch with: ` +
+        `claude --dangerously-load-development-channels plugin:rx-claude-matrix-bridge@arikw`)
     }
   }
 
