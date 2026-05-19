@@ -103,6 +103,12 @@ sed -i \
   README.md
 echo "  ✓ README.md → $NEW"
 
+# GitHub Pages landing page — version badge in the hero block.
+if [[ -f docs/index.html ]]; then
+  sed -i "s|Claude Code plugin · v[0-9]\+\.[0-9]\+\.[0-9]\+|Claude Code plugin · v${NEW}|" docs/index.html
+  echo "  ✓ docs/index.html → $NEW"
+fi
+
 # ---------- rebuild bundle ----------
 
 echo
@@ -115,6 +121,9 @@ echo "  ✓ dist/server.js + dist/daemon.js"
 echo
 echo "Committing + tagging …"
 git add package.json .claude-plugin/plugin.json README.md dist/
+# Stage Pages page only if it has uncommitted changes (it may not, e.g. on
+# a release that doesn't touch it).
+git diff --quiet docs/index.html 2>/dev/null || git add docs/index.html
 git commit -m "chore(release): v${NEW}" >/dev/null
 git tag -a "v${NEW}" -m "v${NEW}"
 echo "  ✓ committed + tagged v${NEW}"
