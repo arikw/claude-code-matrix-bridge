@@ -6,6 +6,8 @@
 > headless `claude --print --resume` when the TUI is offline so messages never get
 > lost.
 
+**Project page:** **<https://arikw.github.io/claude-code-matrix-bridge/>** — visual overview, feature tour, plugin comparison, screenshots.
+
 | | |
 |---|---|
 | **Status** | v0.4.23 — works against Claude Code 2.1.143; channels API still research preview |
