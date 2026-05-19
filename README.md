@@ -38,17 +38,30 @@
 
 ---
 
-## How it differs from other bridges
+## How it compares
 
-| Bridge | Transport | Inbound trigger | Flag needed |
-|---|---|---|---|
-| **This project** | Claude Code Channels API (push) | Matrix msg autonomously wakes the live TUI session | Yes |
-| elkimek/matrix-bridge | MCP tool calls (pull) | Agent must call `send_and_wait` / `read_messages` | No |
-| ccbot / cc-telegram-bridge | tmux send-keys / headless `claude --print` | External transport, not Claude Code-native | No |
+A few Matrix-side plugins for Claude Code exist. Different trade-offs:
 
-This is the only bridge that injects matrix messages into a **live TUI conversation
-turn** rather than spawning a separate `claude` invocation. The Channels API
-research-preview flag is the cost of that integration.
+| Plugin | Transport | Multi-session | Headless fallback | E2EE | Setup wizard |
+|---|---|---|---|---|---|
+| **this project** | Channels API push | ✅ built-in | ✅ auto | ❌ roadmap | ✅ |
+| [elkimek/matrix-bridge](https://github.com/elkimek/matrix-bridge) | MCP tool calls (pull) | ❌ | ❌ | ✅ (vodozemac) | ❌ manual |
+| [nazbav/claude-code-matrix-channel](https://github.com/nazbav/claude-code-matrix-channel) | Channels API push | ❌ | ❌ | ❌ unencrypted only | partial (skill) |
+| [Kholtien/claude-connect-matrix-integration](https://github.com/Kholtien/claude-connect-matrix-integration) | Channels API push | ❌ single-room | ❌ (systemd + tmux scaffold) | ✅ (Rust Olm) | ✅ |
+
+What this plugin wins on: multi-session routing (N rooms ↔ N TUI sessions), headless
+fallback when the TUI is offline, the most complete setup wizard. What other plugins
+have that this one doesn't: end-to-end encryption (elkimek, Kholtien), permission relay
+via reactions (Kholtien), attachment / reaction / edit tools (nazbav).
+
+> All four use Claude Code as the chat-driven AI; the Channels-API-based ones
+> (this project, nazbav, Kholtien) need the `--dangerously-load-development-channels`
+> launch flag and `"channelsEnabled": true` in `~/.claude/settings.json`. Without
+> both, inbound matrix events get silently dropped. This plugin's wizard sets the
+> setting automatically and prints the shell-rc alias for the flag; the others
+> leave both as manual steps.
+>
+> Full comparison + capability matrix on the [project page](https://arikw.github.io/claude-code-matrix-bridge/#compare).
 
 ---
 
@@ -194,7 +207,7 @@ curl -s -X POST "${HS}/_matrix/client/v3/login" \
   | jq -r '.access_token'
 ```
 
-Then continue with step 4 (`/mx-link-chat`).
+Then continue with step 3 (`/mx-link-chat`).
 
 ---
 
@@ -229,10 +242,16 @@ either side of the new pair:
 
 ## TUI ↔ Matrix recap
 
-When you switch channels (talked on TUI, then ping from matrix — or vice versa),
-the bridge auto-prepends a `[channel-switch]` instruction that asks Claude to
-recap activity on the channel you just left before answering. Implicit; no
-magic-word handshake.
+When you switch channels (typed on TUI, then ping from matrix — or vice versa),
+the bridge auto-prepends a `[matrix-bridge recap-since <timestamp>]` instruction
+that asks Claude to recap activity on the channel you just left before answering.
+Implicit; no magic-word handshake.
+
+The instruction also asks Claude to classify the incoming message as a
+substantive request vs a presence-only ping (e.g. "hi", "back", "I'm here").
+On presence-only pings, Claude replies with just the recap plus a single line
+saying whether your attention is required (a pending question, a blocked
+decision) — no invented follow-up questions.
 
 ## TUI prompt mirror
 
@@ -245,57 +264,42 @@ echo back. Unlinked sessions don't mirror.
 
 ## How it works
 
+Three processes, three hops:
+
 ```
-                Matrix homeserver
-                     │  /sync (long-poll)
-                     ▼
-┌─────────────────────────────────────────────┐
-│ daemon.ts (always-on)                       │
-│                                             │
-│  links.tsv:  session_id  room_id  cwd  ...  │
-│                                             │
-│  Inbound m.text from MATRIX_OWNER:          │
-│    1. linked room? lookup session_id        │
-│    2. TUI(session_id) socket alive?         │
-│         → push over AF_UNIX → channel notif │
-│       else:                                 │
-│         → claude --print --resume <sid>     │
-│             --add-dir <cwd>                 │
-│         → post assistant text back to room  │
-│    3. orphan room?                          │
-│       → if exactly 1 TUI registered, route  │
-│       → else drop + log warn                │
-│                                             │
-│  Outbound (reply / link_chat from TUI):     │
-│    → Matrix /createRoom / /join / send      │
-│                                             │
-│  m.typing: debounced 2s, refreshed every    │
-│   20s, off on reply or session_stopped      │
-└─────────┬─────────────────────────▲─────────┘
-          │ AF_UNIX socket          │
-          │ (line-JSON protocol)    │
-          ▼                         │ ack/inbound
-┌─────────────────────────┐         │
-│ server.ts (MCP per TUI) │─────────┘
-│                         │
-│  read CLAUDE_SESSION_ID │
-│  spawn daemon if dead   │
-│  register(sid, cwd)     │
-│  detect channels flag   │
-│                         │
-│  expose tools:          │
-│    reply, link_chat,    │
-│    link_status, unlink, │
-│    list_rooms           │
-│                         │
-│  on inbound from daemon │
-│    → notifications/     │
-│       claude/channel    │
-└─────────────────────────┘
-          │ stdio (MCP)
-          ▼
-   claude TUI session
+matrix client  <->  matrix homeserver         (m.room.message, /sync long-poll)
+matrix homeserver  <->  daemon.ts             (/sync inbound, PUT /rooms/.../send outbound)
+daemon.ts  <->  server.ts (one per TUI)       (AF_UNIX socket, line-JSON: inbound / reply / link_chat)
+server.ts  <->  Claude Code TUI               (stdio MCP: notifications/claude/channel + reply tool)
 ```
+
+**daemon.ts** — always-on Node process. Owns the matrix `/sync` long-poll.
+Maintains `links.tsv` (session_id <-> room_id mapping). On each m.text from
+MATRIX_OWNER:
+
+1. Lookup `links.tsv` for the room.
+2. **Linked**: broadcast the inbound event to that session's AF_UNIX socket.
+   If the socket is unreachable (TUI offline), spawn
+   `claude --print --resume <sid> --add-dir <cwd>` headlessly and post the
+   assistant text back to the room.
+3. **Orphan** (room not in `links.tsv`): drop + log a warn pointing the user
+   to `/mx-link-chat`. The daemon used to auto-route orphan rooms to the
+   sole registered TUI as a convenience, but that caused cross-talk across
+   multi-host setups so it was removed in v0.4.22.
+
+Daemon also debounces matrix `m.typing` (2s onset, refreshed every 20s, off
+on reply or session_stopped) so the room shows a typing indicator while
+Claude is processing.
+
+**server.ts** — stdio MCP server, one per Claude Code TUI. Reads the real
+session_id from the SessionStart-hook-written `sessions/<cc_pid>.json`,
+spawns the daemon if not already running, registers `(session_id, cwd)`
+with the daemon. Detects whether Claude Code was launched with the
+channels flag (via `/proc/<ccPid>/cmdline`) and writes the
+`channels-capable/<sid>` flag for the statusLine to read. Exposes the
+`reply`, `link_chat`, `link_status`, `unlink_chat`, `list_rooms` tools;
+forwards daemon-pushed inbound events as `notifications/claude/channel`
+into the live TUI conversation.
 
 ### State files at `~/.claude/channels/rx-claude-matrix-bridge/`
 
@@ -329,7 +333,7 @@ plugin-root                            # absolute path to repo (self-locate)
 | MCP not connecting (`/mcp` shows nothing) | Confirm `.mcp.json` is present in cwd, flag passed, `claude /mcp` reload. |
 | Channel events not arriving but flag is set | Confirm `"channelsEnabled": true` in `~/.claude/settings.json`. Tail `daemon.log` for `inbound→tui` entries; `server.log` for `DBG mcp.notification SENT`. |
 | `MATRIX_HOMESERVER unset` | Bot couldn't read config.env. Check path + 0600 perms. |
-| 401 in daemon log | `MATRIX_ACCESS_TOKEN` expired or wrong. Regenerate via step 3 curl. |
+| 401 in daemon log | `MATRIX_ACCESS_TOKEN` expired or wrong. Re-run the setup wizard (`bin/mx-setup`) — it'll obtain a fresh token via the bot's password. |
 | Bot ignores invites | Invites must come from `MATRIX_OWNER`. Non-owner invites are logged as `ignoring invite room=... (not from owner)`. |
 | Reply fails | Bot must be a member of the target `chat_id`. Reply tool returns daemon error to Claude. |
 | Daemon won't start | Check `~/.claude/channels/rx-claude-matrix-bridge/daemon.log`. Stale `daemon.pid` for a dead process? Daemon checks via `kill -0` and clears stale pid. |
@@ -408,13 +412,12 @@ surface gated entirely on **matrix account integrity**.
 
 ## Roadmap
 
-- E2EE rooms (olm/megolm sidecar)
-- Permission-relay capability (`claude/channel/permission`) — approve Bash/Edit/Write tool calls from Matrix
-- `react`, `edit_message`, `download_attachment` tools
-- Pairing flow for multi-user
-- systemd / launchd unit for daemon
-- Plugin marketplace publishing (`claude plugin install`)
-- Headless chat for orphan rooms (talk to Claude Code from any room without `/mx-link-chat`)
+- **E2EE rooms** (olm/megolm sidecar). Two of the alternative Matrix bridges already have this; we don't yet.
+- **Permission relay** — approve `Bash` / `Edit` / `Write` tool calls from Matrix (👍/👎 reactions or text reply). Kholtien/claude-connect-matrix-integration has this; we'd implement it differently to fit the multi-session design.
+- **Richer message tools** — `edit_message`, `react`, `download_attachment` so Claude can edit, react, and pull attachments from rooms.
+- **Pairing flow for multi-user** — allow more than one owner via per-session pairing codes (nazbav's approach).
+- **systemd / launchd unit for the daemon** — out-of-the-box always-on without manual nohup tricks.
+- **POSIX-sh-only mode** for hooks + bin scripts — drops the bash dependency for minimal-container setups.
 
 ---
 
