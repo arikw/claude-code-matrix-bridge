@@ -576,65 +576,107 @@
 <section id="compare" class="py-20 md:py-28 bg-ink-900">
   <div class="max-w-5xl mx-auto px-6">
     <div class="text-center mb-12">
-      <h2 class="text-3xl md:text-4xl font-bold">How it's different</h2>
-      <p class="mt-3 text-gray-400 text-lg">
-        The only other Matrix-side option for Claude Code is
-        <a href="https://github.com/elkimek/matrix-bridge" class="text-accent-400 hover:underline">elkimek/matrix-bridge</a>
-        — also great, but a different model: it exposes MCP tools that the agent calls
-        to send/receive matrix messages. This plugin instead uses Claude Code's Channels API
-        to inject inbound matrix events directly into the live TUI conversation.
+      <h2 class="text-3xl md:text-4xl font-bold">How it compares</h2>
+      <p class="mt-3 text-gray-400 text-lg max-w-3xl mx-auto">
+        A few Matrix-side plugins for Claude Code exist now. Different trade-offs.
+        This one is the only one with built-in multi-session routing and a headless
+        fallback when the TUI is offline — but other options have E2EE today, or a
+        permission-relay UX, or attachment tools that this one doesn't.
       </p>
     </div>
 
     <!-- Desktop: full table -->
-    <div class="hidden md:block rounded-xl border border-white/10 overflow-hidden">
-      <table class="w-full text-sm">
+    <div class="hidden md:block rounded-xl border border-white/10 overflow-x-auto">
+      <table class="w-full text-sm min-w-[820px]">
         <thead class="bg-white/5">
-          <tr class="text-left">
-            <th class="px-4 py-3 font-medium text-gray-300">Capability</th>
-            <th class="px-4 py-3 font-semibold winner-col">
-              <span class="text-accent-400">rx-claude-matrix-bridge</span>
+          <tr class="text-left align-top">
+            <th class="px-3 py-3 font-medium text-gray-300">Capability</th>
+            <th class="px-3 py-3 font-semibold winner-col">
+              <a href="https://github.com/arikw/claude-code-matrix-bridge" class="text-accent-400 hover:underline">rx-claude-matrix-bridge</a>
+              <div class="text-[10px] font-normal text-gray-500 mt-0.5">(this project)</div>
             </th>
-            <th class="px-4 py-3 font-medium text-gray-400">elkimek/matrix-bridge</th>
+            <th class="px-3 py-3 font-medium text-gray-300">
+              <a href="https://github.com/elkimek/matrix-bridge" class="hover:underline">elkimek/matrix-bridge</a>
+            </th>
+            <th class="px-3 py-3 font-medium text-gray-300">
+              <a href="https://github.com/nazbav/claude-code-matrix-channel" class="hover:underline">nazbav/claude-code-matrix-channel</a>
+            </th>
+            <th class="px-3 py-3 font-medium text-gray-300">
+              <a href="https://github.com/Kholtien/claude-connect-matrix-integration" class="hover:underline">Kholtien/claude-connect-matrix-integration</a>
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-white/5">
           <tr>
-            <td class="px-4 py-3 text-gray-300">Transport</td>
-            <td class="px-4 py-3 winner-col">Channels API push</td>
-            <td class="px-4 py-3 text-gray-400">MCP tool calls (pull)</td>
+            <td class="px-3 py-3 text-gray-300">Transport</td>
+            <td class="px-3 py-3 winner-col">Channels API push</td>
+            <td class="px-3 py-3 text-gray-400">MCP tool calls (pull)</td>
+            <td class="px-3 py-3 text-gray-400">Channels API push</td>
+            <td class="px-3 py-3 text-gray-400">Channels API push</td>
           </tr>
           <tr>
-            <td class="px-4 py-3 text-gray-300">Wakes live TUI session</td>
-            <td class="px-4 py-3 winner-col text-green-400">yes</td>
-            <td class="px-4 py-3 text-red-400/80">no — agent must call read_messages</td>
+            <td class="px-3 py-3 text-gray-300">Wakes live TUI session</td>
+            <td class="px-3 py-3 winner-col text-green-400">yes</td>
+            <td class="px-3 py-3 text-red-400/80">no — agent must call read_messages</td>
+            <td class="px-3 py-3 text-green-400">yes</td>
+            <td class="px-3 py-3 text-green-400">yes</td>
           </tr>
           <tr>
-            <td class="px-4 py-3 text-gray-300">Multi-session routing</td>
-            <td class="px-4 py-3 winner-col text-green-400">built-in</td>
-            <td class="px-4 py-3 text-red-400/80">no</td>
+            <td class="px-3 py-3 text-gray-300">Multi-session routing (N rooms → N sessions)</td>
+            <td class="px-3 py-3 winner-col text-green-400">built-in</td>
+            <td class="px-3 py-3 text-red-400/80">no</td>
+            <td class="px-3 py-3 text-red-400/80">no</td>
+            <td class="px-3 py-3 text-red-400/80">single-room (MATRIX_ROOM_ID)</td>
           </tr>
           <tr>
-            <td class="px-4 py-3 text-gray-300">Headless fallback when TUI offline</td>
-            <td class="px-4 py-3 winner-col text-green-400">auto</td>
-            <td class="px-4 py-3 text-red-400/80">no</td>
+            <td class="px-3 py-3 text-gray-300">Headless fallback when TUI offline</td>
+            <td class="px-3 py-3 winner-col text-green-400">auto (spawns claude --print --resume)</td>
+            <td class="px-3 py-3 text-red-400/80">no</td>
+            <td class="px-3 py-3 text-red-400/80">no</td>
+            <td class="px-3 py-3 text-red-400/80">no (but systemd + tmux scaffold)</td>
           </tr>
           <tr>
-            <td class="px-4 py-3 text-gray-300">Interactive setup wizard</td>
-            <td class="px-4 py-3 winner-col text-green-400">yes</td>
-            <td class="px-4 py-3 text-red-400/80">manual</td>
+            <td class="px-3 py-3 text-gray-300">Interactive setup wizard</td>
+            <td class="px-3 py-3 winner-col text-green-400">yes (one-shot login + secrets write)</td>
+            <td class="px-3 py-3 text-red-400/80">manual</td>
+            <td class="px-3 py-3 text-yellow-400/80">partial (/matrix:access skill)</td>
+            <td class="px-3 py-3 text-green-400">yes (/matrix:configure skill)</td>
           </tr>
           <tr>
-            <td class="px-4 py-3 text-gray-300">End-to-end encryption (E2EE)</td>
-            <td class="px-4 py-3 text-yellow-400/80">roadmap</td>
-            <td class="px-4 py-3 winner-col text-green-400">built-in</td>
+            <td class="px-3 py-3 text-gray-300">End-to-end encryption (E2EE)</td>
+            <td class="px-3 py-3 text-yellow-400/80">roadmap</td>
+            <td class="px-3 py-3 text-green-400">built-in (vodozemac)</td>
+            <td class="px-3 py-3 text-red-400/80">no — encrypted rooms dropped</td>
+            <td class="px-3 py-3 text-green-400">built-in (Rust Olm/Megolm)</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-3 text-gray-300">Permission relay (approve Bash/Edit from matrix)</td>
+            <td class="px-3 py-3 text-red-400/80">no</td>
+            <td class="px-3 py-3 text-red-400/80">no</td>
+            <td class="px-3 py-3 text-red-400/80">no</td>
+            <td class="px-3 py-3 text-green-400">yes (👍/👎 reactions or text reply)</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-3 text-gray-300">Attachments / reactions / edits</td>
+            <td class="px-3 py-3 text-red-400/80">text only</td>
+            <td class="px-3 py-3 text-yellow-400/80">text + send_and_wait</td>
+            <td class="px-3 py-3 text-green-400">edit_message, react, download_attachment</td>
+            <td class="px-3 py-3 text-yellow-400/80">reactions for permission UX</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-3 text-gray-300">Owner-only access gate</td>
+            <td class="px-3 py-3 winner-col text-green-400">yes (env-configured)</td>
+            <td class="px-3 py-3 text-yellow-400/80">n/a (agent-controlled)</td>
+            <td class="px-3 py-3 text-green-400">yes (pairing + allowlist)</td>
+            <td class="px-3 py-3 text-green-400">yes (allowlist)</td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Mobile: stacked card per capability -->
+    <!-- Mobile: stacked card per capability — 4 projects per card -->
     <div class="md:hidden space-y-4">
+
       <div class="rounded-xl border border-white/10 bg-ink-800/40 overflow-hidden">
         <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">Transport</div>
         <div class="divide-y divide-white/5 text-sm">
@@ -645,6 +687,14 @@
           <div class="px-4 py-2.5 flex justify-between gap-3">
             <span class="text-gray-500">elkimek/matrix-bridge</span>
             <span class="text-right text-gray-400">MCP tool calls (pull)</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">nazbav/…matrix-channel</span>
+            <span class="text-right text-gray-400">Channels API push</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">Kholtien/…matrix-integration</span>
+            <span class="text-right text-gray-400">Channels API push</span>
           </div>
         </div>
       </div>
@@ -660,6 +710,14 @@
             <span class="text-gray-500">elkimek/matrix-bridge</span>
             <span class="text-right text-red-400/80">no — agent must call read_messages</span>
           </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">nazbav/…matrix-channel</span>
+            <span class="text-right text-green-400">yes</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">Kholtien/…matrix-integration</span>
+            <span class="text-right text-green-400">yes</span>
+          </div>
         </div>
       </div>
 
@@ -673,6 +731,14 @@
           <div class="px-4 py-2.5 flex justify-between gap-3">
             <span class="text-gray-500">elkimek/matrix-bridge</span>
             <span class="text-right text-red-400/80">no</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">nazbav/…matrix-channel</span>
+            <span class="text-right text-red-400/80">no</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">Kholtien/…matrix-integration</span>
+            <span class="text-right text-red-400/80">single-room</span>
           </div>
         </div>
       </div>
@@ -688,6 +754,14 @@
             <span class="text-gray-500">elkimek/matrix-bridge</span>
             <span class="text-right text-red-400/80">no</span>
           </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">nazbav/…matrix-channel</span>
+            <span class="text-right text-red-400/80">no</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">Kholtien/…matrix-integration</span>
+            <span class="text-right text-red-400/80">no (systemd + tmux scaffold)</span>
+          </div>
         </div>
       </div>
 
@@ -702,6 +776,14 @@
             <span class="text-gray-500">elkimek/matrix-bridge</span>
             <span class="text-right text-red-400/80">manual</span>
           </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">nazbav/…matrix-channel</span>
+            <span class="text-right text-yellow-400/80">partial (skill)</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">Kholtien/…matrix-integration</span>
+            <span class="text-right text-green-400">yes (configure skill)</span>
+          </div>
         </div>
       </div>
 
@@ -712,9 +794,61 @@
             <span class="text-gray-500">rx-claude-matrix-bridge</span>
             <span class="text-right text-yellow-400/80">roadmap</span>
           </div>
-          <div class="px-4 py-2.5 flex justify-between gap-3 winner-col">
-            <span class="text-accent-400 font-medium">elkimek/matrix-bridge</span>
-            <span class="text-right text-green-400">built-in</span>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">elkimek/matrix-bridge</span>
+            <span class="text-right text-green-400">built-in (vodozemac)</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">nazbav/…matrix-channel</span>
+            <span class="text-right text-red-400/80">no — encrypted rooms dropped</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">Kholtien/…matrix-integration</span>
+            <span class="text-right text-green-400">built-in (Rust Olm)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-white/10 bg-ink-800/40 overflow-hidden">
+        <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">Permission relay (approve tools from matrix)</div>
+        <div class="divide-y divide-white/5 text-sm">
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">rx-claude-matrix-bridge</span>
+            <span class="text-right text-red-400/80">no</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">elkimek/matrix-bridge</span>
+            <span class="text-right text-red-400/80">no</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">nazbav/…matrix-channel</span>
+            <span class="text-right text-red-400/80">no</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">Kholtien/…matrix-integration</span>
+            <span class="text-right text-green-400">yes (reactions or text)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-white/10 bg-ink-800/40 overflow-hidden">
+        <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">Attachments / reactions / edits</div>
+        <div class="divide-y divide-white/5 text-sm">
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">rx-claude-matrix-bridge</span>
+            <span class="text-right text-red-400/80">text only</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">elkimek/matrix-bridge</span>
+            <span class="text-right text-yellow-400/80">text + send_and_wait</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">nazbav/…matrix-channel</span>
+            <span class="text-right text-green-400">edit, react, download_attachment</span>
+          </div>
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">Kholtien/…matrix-integration</span>
+            <span class="text-right text-yellow-400/80">reactions for permission UX</span>
           </div>
         </div>
       </div>
