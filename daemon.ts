@@ -485,27 +485,18 @@ async function deliverInbound(roomId: string, evt: any): Promise<void> {
     return
   }
 
-  const inbound: InboundMsg = {
-    type: 'inbound',
-    room_id: roomId,
-    room_name: name,
-    message_id: evt.event_id,
-    sender: evt.sender,
-    body,
-    ts: new Date(Number(evt.origin_server_ts) || Date.now()).toISOString(),
-  }
-
-  // 2. Orphan room. If exactly one TUI session registered (one or more
-  //    sockets all belonging to it), route there.
-  if (registered.size === 1) {
-    const [session_id] = registered.keys()
-    startTyping(roomId)
-    broadcastToSession(session_id, inbound)
-    await log('info', `inbound→tui room=${roomId} sid=${session_id} (orphan→sole)`)
-    return
-  }
-
-  await log('warn', `inbound dropped room=${roomId} (orphan, ${regCount()} sockets across ${registered.size} sessions)`)
+  // Orphan room — not in links.tsv. Previously the daemon would route to
+  // the sole registered TUI as a convenience for first-use, but that
+  // caused cross-talk (msgs intended for a different session landing in
+  // an unrelated TUI, especially when the same bot account is reachable
+  // from multiple hosts each with their own daemon). Drop + log loudly
+  // so the user knows to run /mx-link-chat before typing in the room.
+  await log(
+    'warn',
+    `inbound dropped room=${roomId} sender=${evt.sender} bytes=${body.length} (orphan, ` +
+    `${regCount()} sockets across ${registered.size} sessions). Run /mx-link-chat ` +
+    `in a Claude Code session to bind this room.`,
+  )
 }
 
 // ---------- headless fallback ----------
