@@ -578,8 +578,11 @@
     <div class="text-center mb-12">
       <h2 class="text-3xl md:text-4xl font-bold">How it's different</h2>
       <p class="mt-3 text-gray-400 text-lg">
-        Other matrix/chat bridges spawn a fresh process per message or poll for updates. This one
-        is the only plugin that <em class="text-white">injects matrix messages into a live Claude Code TUI conversation</em>.
+        The only other Matrix-side option for Claude Code is
+        <a href="https://github.com/elkimek/matrix-bridge" class="text-accent-400 hover:underline">elkimek/matrix-bridge</a>
+        — also great, but a different model: it exposes MCP tools that the agent calls
+        to send/receive matrix messages. This plugin instead uses Claude Code's Channels API
+        to inject inbound matrix events directly into the live TUI conversation.
       </p>
     </div>
 
@@ -593,7 +596,6 @@
               <span class="text-accent-400">rx-claude-matrix-bridge</span>
             </th>
             <th class="px-4 py-3 font-medium text-gray-400">elkimek/matrix-bridge</th>
-            <th class="px-4 py-3 font-medium text-gray-400">ccbot, cc-telegram-bridge</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-white/5">
@@ -601,37 +603,31 @@
             <td class="px-4 py-3 text-gray-300">Transport</td>
             <td class="px-4 py-3 winner-col">Channels API push</td>
             <td class="px-4 py-3 text-gray-400">MCP tool calls (pull)</td>
-            <td class="px-4 py-3 text-gray-400">tmux keys / headless print</td>
           </tr>
           <tr>
             <td class="px-4 py-3 text-gray-300">Wakes live TUI session</td>
             <td class="px-4 py-3 winner-col text-green-400">yes</td>
-            <td class="px-4 py-3 text-red-400/80">no — agent must poll</td>
-            <td class="px-4 py-3 text-yellow-400/80">tmux only</td>
+            <td class="px-4 py-3 text-red-400/80">no — agent must call read_messages</td>
           </tr>
           <tr>
             <td class="px-4 py-3 text-gray-300">Multi-session routing</td>
             <td class="px-4 py-3 winner-col text-green-400">built-in</td>
             <td class="px-4 py-3 text-red-400/80">no</td>
-            <td class="px-4 py-3 text-yellow-400/80">manual tmux setup</td>
           </tr>
           <tr>
             <td class="px-4 py-3 text-gray-300">Headless fallback when TUI offline</td>
             <td class="px-4 py-3 winner-col text-green-400">auto</td>
-            <td class="px-4 py-3 text-red-400/80">no</td>
             <td class="px-4 py-3 text-red-400/80">no</td>
           </tr>
           <tr>
             <td class="px-4 py-3 text-gray-300">Interactive setup wizard</td>
             <td class="px-4 py-3 winner-col text-green-400">yes</td>
             <td class="px-4 py-3 text-red-400/80">manual</td>
-            <td class="px-4 py-3 text-red-400/80">manual</td>
           </tr>
           <tr>
-            <td class="px-4 py-3 text-gray-300">Works with Matrix (not Telegram-only)</td>
-            <td class="px-4 py-3 winner-col text-green-400">yes</td>
-            <td class="px-4 py-3 text-green-400">yes</td>
-            <td class="px-4 py-3 text-red-400/80">Telegram</td>
+            <td class="px-4 py-3 text-gray-300">End-to-end encryption (E2EE)</td>
+            <td class="px-4 py-3 text-yellow-400/80">roadmap</td>
+            <td class="px-4 py-3 winner-col text-green-400">built-in</td>
           </tr>
         </tbody>
       </table>
@@ -650,10 +646,6 @@
             <span class="text-gray-500">elkimek/matrix-bridge</span>
             <span class="text-right text-gray-400">MCP tool calls (pull)</span>
           </div>
-          <div class="px-4 py-2.5 flex justify-between gap-3">
-            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
-            <span class="text-right text-gray-400">tmux keys / headless print</span>
-          </div>
         </div>
       </div>
 
@@ -666,11 +658,7 @@
           </div>
           <div class="px-4 py-2.5 flex justify-between gap-3">
             <span class="text-gray-500">elkimek/matrix-bridge</span>
-            <span class="text-right text-red-400/80">no — agent must poll</span>
-          </div>
-          <div class="px-4 py-2.5 flex justify-between gap-3">
-            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
-            <span class="text-right text-yellow-400/80">tmux only</span>
+            <span class="text-right text-red-400/80">no — agent must call read_messages</span>
           </div>
         </div>
       </div>
@@ -686,10 +674,6 @@
             <span class="text-gray-500">elkimek/matrix-bridge</span>
             <span class="text-right text-red-400/80">no</span>
           </div>
-          <div class="px-4 py-2.5 flex justify-between gap-3">
-            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
-            <span class="text-right text-yellow-400/80">manual tmux setup</span>
-          </div>
         </div>
       </div>
 
@@ -702,10 +686,6 @@
           </div>
           <div class="px-4 py-2.5 flex justify-between gap-3">
             <span class="text-gray-500">elkimek/matrix-bridge</span>
-            <span class="text-right text-red-400/80">no</span>
-          </div>
-          <div class="px-4 py-2.5 flex justify-between gap-3">
-            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
             <span class="text-right text-red-400/80">no</span>
           </div>
         </div>
@@ -722,30 +702,23 @@
             <span class="text-gray-500">elkimek/matrix-bridge</span>
             <span class="text-right text-red-400/80">manual</span>
           </div>
-          <div class="px-4 py-2.5 flex justify-between gap-3">
-            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
-            <span class="text-right text-red-400/80">manual</span>
-          </div>
         </div>
       </div>
 
       <div class="rounded-xl border border-white/10 bg-ink-800/40 overflow-hidden">
-        <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">Works with Matrix (not Telegram-only)</div>
+        <div class="bg-white/5 px-4 py-2.5 text-sm font-medium text-gray-200">End-to-end encryption (E2EE)</div>
         <div class="divide-y divide-white/5 text-sm">
+          <div class="px-4 py-2.5 flex justify-between gap-3">
+            <span class="text-gray-500">rx-claude-matrix-bridge</span>
+            <span class="text-right text-yellow-400/80">roadmap</span>
+          </div>
           <div class="px-4 py-2.5 flex justify-between gap-3 winner-col">
-            <span class="text-accent-400 font-medium">rx-claude-matrix-bridge</span>
-            <span class="text-right text-green-400">yes</span>
-          </div>
-          <div class="px-4 py-2.5 flex justify-between gap-3">
-            <span class="text-gray-500">elkimek/matrix-bridge</span>
-            <span class="text-right text-green-400">yes</span>
-          </div>
-          <div class="px-4 py-2.5 flex justify-between gap-3">
-            <span class="text-gray-500">ccbot, cc-telegram-bridge</span>
-            <span class="text-right text-red-400/80">Telegram</span>
+            <span class="text-accent-400 font-medium">elkimek/matrix-bridge</span>
+            <span class="text-right text-green-400">built-in</span>
           </div>
         </div>
       </div>
+
     </div>
 
     <p class="text-center text-sm text-gray-500 mt-6">
